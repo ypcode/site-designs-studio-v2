@@ -1,0 +1,13 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/package-solution.schema.json",
+  "solution": {
+    "name": "site-designs-studio-v-2-client-side-solution",
+    "id": "83580513-8ac2-4fdc-89f5-5f44e4364309",
+    "version": "1.0.0.0",
+    "includeClientSideAssets": true,
+    "isDomainIsolated": false
+  },
+  "paths": {
+    "zippedPackage": "solution/site-designs-studio-v-2.sppkg"
+  }
+}
