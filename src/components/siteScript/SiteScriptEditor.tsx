@@ -27,7 +27,7 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
 
     // Use state values
     const [editingSiteScript, setEditingSiteScript] = useState<ISiteScript>(props.siteScript);
-    const [focusedField, setFocusedField] = useState<string>("");
+    const [editingSiteScriptContent, setEditingSiteScriptContent] = useState<ISiteScriptContent>(props.siteScript.Content);
     const [isSaving, setIsSaving] = useState<boolean>(false);
 
 
@@ -49,6 +49,7 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
         console.log("Loading site script...", props.siteScript.Id);
         siteDesignsService.getSiteScript(props.siteScript.Id).then(loadedSiteScript => {
             setEditingSiteScript(loadedSiteScript);
+            setEditingSiteScriptContent(loadedSiteScript.Content);
             console.log("Loaded: ", loadedSiteScript);
         }).catch(error => {
             console.error(`The Site Script ${props.siteScript.Id} could not be loaded`, error);
@@ -72,13 +73,14 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
         }
     };
 
-    const onSiteScriptContentUpdated = (siteScriptContent: ISiteScriptContent) => {
-        setEditingSiteScript({ ...editingSiteScript, Content: siteScriptContent });
+    const onSiteScriptContentUpdated = (updatedContent: ISiteScriptContent) => {
+        setEditingSiteScriptContent(updatedContent);
     };
 
     const onSave = async () => {
         setIsSaving(true);
-        await siteDesignsService.saveSiteScript(editingSiteScript);
+        const toSave = { ...editingSiteScript, Content: editingSiteScriptContent };
+        await siteDesignsService.saveSiteScript(toSave);
         const refreshedSiteScripts = await siteDesignsService.getSiteScripts();
         execute("SET_ALL_AVAILABLE_SITE_SCRIPTS", { siteScripts: refreshedSiteScripts } as ISetAllAvailableSiteScripts);
         setIsSaving(false);
