@@ -101,6 +101,10 @@
 .row {
     @include ms-Grid-row;
 
+    .fullWidth {
+        @include ms-Grid-col;
+        @include ms-sm12;
+    }
     .column1 {
         @include ms-Grid-col;
         @include ms-sm1;
@@ -108,5 +112,20 @@
     .column9 {
         @include ms-Grid-col;
         @include ms-sm9;
+    }
+    .column10 {
+        @include ms-Grid-col;
+        @include ms-sm10;
+    }
+}
+
+.iconSearch {
+    display: inline-block;
+    
+    [data-icon-name="Search"] {
+        position: relative;
+        top: 10px;
+        left: 10px;
+        margin-right: 10px;
     }
 }

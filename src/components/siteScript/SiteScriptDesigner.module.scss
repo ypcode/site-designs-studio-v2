@@ -124,7 +124,7 @@
 
     &.isEditing {
       .properties {
-        max-height: 3000px;
+        max-height: unset;
         transition: opacity 1s ease-in-out;
         opacity: 1;
       }

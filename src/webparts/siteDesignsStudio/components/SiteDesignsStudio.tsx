@@ -3,20 +3,19 @@ import styles from './SiteDesignsStudio.module.scss';
 import { find } from '@microsoft/sp-lodash-subset';
 import { SiteDesignEditor } from "../../../components/siteDesign/SiteDesignEditor";
 import { SiteScriptEditor } from "../../../components/siteScript/SiteScriptEditor";
-import { SiteDesignsList } from "../../../components/siteDesign/SiteDesignsList";
+import { SiteDesignsListInContext } from "../../../components/siteDesign/SiteDesignsListInContext";
 import { SiteScriptsList } from "../../../components/siteScript/SiteScriptsList";
 import { IApplicationState } from '../../../app/ApplicationState';
 import { App, useAppContext } from '../../../app/App';
 import { Reducers } from '../../../app/ApplicationReducers';
 import { ActionType, IGoToActionArgs, ISetAllAvailableSiteDesigns, ISetAllAvailableSiteScripts, IEditSiteDesignActionArgs, IEditSiteScriptActionArgs } from '../../../app/IApplicationAction';
-
+import {Debugger} from "../../../components/common/Debugger/Debugger";
 
 import { Nav, INavLink, INav } from 'office-ui-fabric-react/lib/Nav';
 
 import { useEffect, useState } from 'react';
 import { SiteDesignsServiceKey } from '../../../services/siteDesigns/SiteDesignsService';
 import { Link } from 'office-ui-fabric-react/lib/Link';
-import { Spinner, SpinnerType } from 'office-ui-fabric-react/lib/Spinner';
 
 const AppLayout = (props: any) => {
   const [appState, execute] = useAppContext<IApplicationState, ActionType>();
@@ -185,7 +184,7 @@ const AppPage = (props: any) => {
       content = <SiteDesignEditor siteDesign={appContext.currentSiteDesign} />;
       break;
     case "SiteDesignsList":
-      content = <SiteDesignsList />;
+      content = <SiteDesignsListInContext />;
       break;
     case "SiteScriptEdition":
       content = <SiteScriptEditor siteScript={appContext.currentSiteScript} />;
@@ -197,21 +196,17 @@ const AppPage = (props: any) => {
     default:
       content = <div>
         <h2><Link onClick={() => execute("GO_TO", { page: "SiteDesignsList" })}>Site Deisgns</Link></h2>
-        <SiteDesignsList preview />
+        <SiteDesignsListInContext preview />
         <h2><Link onClick={() => execute("GO_TO", { page: "SiteScriptsList" })}>Site Scripts</Link></h2>
         <SiteScriptsList preview />
       </div>;
   }
 
+  if (window.location.search.indexOf('debug=1') >= 0) {
+    return <Debugger />;
+  }
+
   return <>
-    {appContext.isLoading && <div className={styles.loading}>
-      <div className={styles.loadingOverlay}>
-        <div className={styles.loadingIndicator}>
-          <Spinner type={SpinnerType.large} />
-          <h1>Loading...</h1>
-        </div>
-      </div>
-    </div>}
     {content}
   </>;
 };

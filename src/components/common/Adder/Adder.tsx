@@ -6,7 +6,7 @@ import { Label } from "office-ui-fabric-react/lib/Label";
 import { mergeStyles } from 'office-ui-fabric-react/lib/Styling';
 import styles from "./Adder.module.scss";
 import { useRef, useState, useEffect } from "react";
-import { TextField, ITextField } from "office-ui-fabric-react";
+import { TextField, ITextField, Stack } from "office-ui-fabric-react";
 import { getTrimmedText } from "../../../utils/textUtils";
 
 export interface IAddableItem {
@@ -52,8 +52,8 @@ const renderItem = (item: IAddableItem, index: number, onSelectedItem: (item: IA
 const renderItemsList = (items: IAddableItemsGroups, filter: string, onSelectedItem: (item: IAddableItem) => void, noAvailableItemsText?: string) => <div className={styles.itemsList}>
     {Object.keys(items).map(group => {
         const groupItems = items[group];
-        return <section key={`group_${group}_header`} className={styles.groupHeader}>
-            <header>{group}</header>
+        return <section key={`group_${group}_header`}>
+            <header className={styles.groupHeader}>{group}</header>
             <div key={`group_${group}_items`} className={styles.groupContent}>
                 {(!groupItems || groupItems.length == 0)
                     ? (noAvailableItemsText || DEFAULT_NO_AVAILABLE_ITEMS_TEXT)
@@ -75,7 +75,7 @@ export const Adder = (props: IAdderProps) => {
         if (isSelecting && searchBoxRef && searchBoxRef.current) {
             searchBoxRef.current.focus();
         }
-    }, [isSelecting]);
+    });
 
     const onSelected = (item: IAddableItem) => {
         props.onSelectedItem(item);
@@ -103,18 +103,17 @@ export const Adder = (props: IAdderProps) => {
             directionalHint={DirectionalHint.bottomCenter}
         >
             <div className={styles.row}>
-                <div className={styles.column1}>
-                    <IconButton iconProps={{ iconName: "Search" }} />
-                </div>
-                <div className={styles.column9}>
-                    <TextField
-                        key="ItemSearchBox"
-                        borderless
-                        componentRef={ref => { searchBoxRef.current = ref; }}
-                        placeholder={props.searchBoxPlaceholderText || "Search an item..."} onChange={onSearchCriteriaChanged} />
-                </div>
-                <div className={styles.column1}>
-                    <IconButton iconProps={{ iconName: "FullScreen" }} />
+                <div className={styles.fullWidth}>
+                    <Stack horizontal>
+                        <div className={styles.iconSearch}>
+                            <Icon iconName="Search" />
+                        </div>
+                        <TextField
+                            key="ItemSearchBox"
+                            borderless
+                            componentRef={searchBoxRef}
+                            placeholder={props.searchBoxPlaceholderText || "Search an item..."} onChange={onSearchCriteriaChanged} />
+                    </Stack>
                 </div>
             </div>
             {renderItemsList(props.items, searchCriteria && searchCriteria.toLowerCase(), onSelected, props.noAvailableItemsText)}

@@ -751,6 +751,11 @@ export default {
 					),
 					type: 'boolean'
 				},
+				group: {
+					title: getPropertyTitle('group', 'createContentType', 'Group'),
+					description: getPropertyDescription('group', 'createContentType', 'The group of the Content Type'),
+					type: 'string'
+				},
 				subactions: {
 					title: getPropertyTitle('subactions', 'createContentType', 'Sub actions'),
 					description: getPropertyDescription(
@@ -767,7 +772,8 @@ export default {
 					}
 				}
 			},
-			required: ['verb', 'name']
+			required: ['verb', 'name'],
+			additionalProperties: false
 		},
 		createSPList: {
 			type: 'object',
@@ -940,9 +946,9 @@ export default {
 			required: ['verb', 'themeName']
 		},
 		setSiteBranding: {
-			type: 'object',
 			title: getActionTitle('setSiteBranding', 'Set branding properties'),
 			description: getActionDescription('setSiteBranding', 'Use the setSiteBranding verb to specify the navigation layout, the header layout, and header background'),
+			type: 'object',
 			properties: {
 				verb: {
 					enum: ['setSiteBranding']
@@ -968,7 +974,13 @@ export default {
 					type: 'boolean'
 				}
 			},
-			required: ['verb']
+			anyOf: [
+				{ required: ['verb', 'navigationLayout'] },
+				{ required: ['verb', 'headerLayout'] },
+				{ required: ['verb', 'headerBackground'] },
+				{ required: ['verb', 'showFooter'] }
+			],
+			additionalProperties: false
 		},
 		setSiteLogo: {
 			type: 'object',
@@ -1272,7 +1284,6 @@ export default {
 					{ type: 'object', $ref: '#/definitions/addNavLink' },
 					{ type: 'object', $ref: '#/definitions/removeNavLink' },
 					{ type: 'object', $ref: '#/definitions/applyTheme' },
-					{ type: 'object', $ref: '#/definitions/setSiteBranding' },
 					{ type: 'object', $ref: '#/definitions/setSiteLogo' },
 					{ type: 'object', $ref: '#/definitions/joinHubSite' },
 					{ type: 'object', $ref: '#/definitions/installSolution' },
@@ -1281,7 +1292,8 @@ export default {
 					{ type: 'object', $ref: '#/definitions/triggerFlow' },
 					{ type: 'object', $ref: '#/definitions/setRegionalSettings' },
 					{ type: 'object', $ref: '#/definitions/addPrincipalToGroup' },
-					{ type: 'object', $ref: '#/definitions/setSiteExternalSharingCapability' }
+					{ type: 'object', $ref: '#/definitions/setSiteExternalSharingCapability' },
+					{ type: 'object', $ref: '#/definitions/setSiteBranding' }
 				]
 			}
 		},

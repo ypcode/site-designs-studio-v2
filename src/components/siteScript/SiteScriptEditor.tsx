@@ -1,21 +1,23 @@
 import * as React from "react";
 import { useState, useEffect, useRef } from "react";
 import styles from "./SiteScriptEditor.module.scss";
-import { TextField, PrimaryButton, Label, Spinner, SpinnerType, Slider } from "office-ui-fabric-react";
+import { TextField, PrimaryButton, Label, Spinner, SpinnerType, Slider, Stack, DefaultButton, ProgressIndicator } from "office-ui-fabric-react";
 import { useAppContext } from "../../app/App";
 import { IApplicationState } from "../../app/ApplicationState";
-import { ActionType, ISetAllAvailableSiteScripts } from "../../app/IApplicationAction";
+import { ActionType, ISetAllAvailableSiteScripts, IGoToActionArgs } from "../../app/IApplicationAction";
 import { SiteScriptDesigner } from "./SiteScriptDesigner";
 import { SiteDesignsServiceKey } from "../../services/siteDesigns/SiteDesignsService";
 import { ISiteScript, ISiteScriptContent, ISiteScriptAction } from "../../models/ISiteScript";
 import CodeEditor, { monaco } from "@monaco-editor/react";
 import { SiteScriptSchemaServiceKey } from "../../services/siteScriptSchema/SiteScriptSchemaService";
+import { useConstCallback } from "@uifabric/react-hooks";
+import { Confirm } from "../common/Confirm/Confirm";
 
 export interface ISiteScriptEditorProps {
     siteScript: ISiteScript;
 }
 
-const siteScriptContentToCodeString = (siteScriptContent: ISiteScriptContent) => JSON.stringify(siteScriptContent, null, 4);
+const siteScriptContentToCodeString = (siteScriptContent: ISiteScriptContent) => JSON.stringify(siteScriptContent, null, 2);
 
 export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
 
@@ -26,13 +28,20 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
     const siteScriptSchemaService = appContext.serviceScope.consume(SiteScriptSchemaServiceKey);
 
     // Use state values
-    const [editingSiteScript, setEditingSiteScript] = useState<ISiteScript>(props.siteScript);
     const [editingSiteScriptContent, setEditingSiteScriptContent] = useState<ISiteScriptContent>(props.siteScript.Content);
     const [isSaving, setIsSaving] = useState<boolean>(false);
 
-
     // Use refs
     const codeEditorRef = useRef<any>();
+    const titleFieldRef = useRef<any>();
+    // We don't use editingSiteScript object as state but as a referenced object
+    const editingSiteScriptRef = useRef<ISiteScript>(props.siteScript);
+    const getEditingSiteScript = () => editingSiteScriptRef && editingSiteScriptRef.current;
+    const setEditingSiteScript = (siteScript: ISiteScript) => {
+        if (editingSiteScriptRef && editingSiteScriptRef.current) {
+            editingSiteScriptRef.current = siteScript;
+        }
+    };
 
     const setLoading = (loading: boolean) => {
         execute("SET_LOADING", { loading });
@@ -42,6 +51,9 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
     useEffect(() => {
         if (!props.siteScript.Id) {
             setEditingSiteScript(props.siteScript);
+            if (titleFieldRef.current) {
+                titleFieldRef.current.focus();
+            }
             return;
         }
 
@@ -59,17 +71,22 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
     }, [props.siteScript]);
 
     const onTitleChanged = (ev: any, title: string) => {
-        setEditingSiteScript({ ...editingSiteScript, Title: title });
+        setEditingSiteScript({ ...getEditingSiteScript(), Title: title });
     };
 
-    const onDescriptionChanged = (ev: any, description: string) => {
-        setEditingSiteScript({ ...editingSiteScript, Description: description });
+    let currentDescription = useRef<string>(getEditingSiteScript().Description);
+    const onDescriptionChanging = (ev: any, description: string) => {
+        currentDescription.current = description;
     };
+
+    const onDescriptionInputBlur = useConstCallback((ev: any) => {
+        setEditingSiteScript({ ...getEditingSiteScript(), Description: currentDescription.current });
+    });
 
     const onVersionChanged = (ev: any, version: string) => {
         const versionInt = parseInt(version);
         if (!isNaN(versionInt)) {
-            setEditingSiteScript({ ...editingSiteScript, Version: versionInt });
+            setEditingSiteScript({ ...getEditingSiteScript(), Version: versionInt });
         }
     };
 
@@ -79,10 +96,26 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
 
     const onSave = async () => {
         setIsSaving(true);
-        const toSave = { ...editingSiteScript, Content: editingSiteScriptContent };
+        const toSave = { ...getEditingSiteScript(), Content: editingSiteScriptContent };
         await siteDesignsService.saveSiteScript(toSave);
         const refreshedSiteScripts = await siteDesignsService.getSiteScripts();
         execute("SET_ALL_AVAILABLE_SITE_SCRIPTS", { siteScripts: refreshedSiteScripts } as ISetAllAvailableSiteScripts);
+        setIsSaving(false);
+    };
+
+    const onDelete = async () => {
+        if (!await Confirm.show({
+            title: `Delete Site Script`,
+            message: `Are you sure you want to delete ${(editingSiteScriptRef.current && editingSiteScriptRef.current.Title) || "this Site Script"} ?`
+        })) {
+            return;
+        }
+
+        setIsSaving(true);
+        await siteDesignsService.deleteSiteScript(editingSiteScriptRef.current);
+        const refreshedSiteScripts = await siteDesignsService.getSiteScripts();
+        execute("SET_ALL_AVAILABLE_SITE_SCRIPTS", { siteScripts: refreshedSiteScripts } as ISetAllAvailableSiteScripts);
+        execute("GO_TO", { page: "SiteScriptsList" } as IGoToActionArgs);
         setIsSaving(false);
     };
 
@@ -100,7 +133,7 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
             try {
                 const updatedScriptContent = JSON.parse(updatedCode);
                 if (siteScriptSchemaService.validateSiteScriptJson(updatedScriptContent)) {
-                    setEditingSiteScript({ ...editingSiteScript, Content: updatedScriptContent });
+                    setEditingSiteScriptContent(updatedScriptContent);
                 }
             } catch (error) {
                 console.warn("Code is not valid site script JSON");
@@ -134,6 +167,9 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
         });
     };
 
+    const isLoading = appContext.isLoading;
+
+    console.log("RERENDER SiteScriptEditor");
     return <div className={styles.SiteScriptEditor}>
         <div className={styles.row}>
             <div className={styles.columnLayout}>
@@ -154,26 +190,31 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
                             }}
                             placeholder="Enter the name of the Site Script..."
                             borderless
-                            value={editingSiteScript.Title}
+                            componentRef={titleFieldRef}
+                            value={getEditingSiteScript().Title}
                             onChange={onTitleChanged} />
+                        {isLoading && <ProgressIndicator />}
                     </div>
-                    <div className={`${styles.column1} ${styles.righted}`}>
-                        <PrimaryButton disabled={isSaving} text="Save" iconProps={{ iconName: "Save" }} onClick={() => onSave()} />
-                    </div>
+                    {!isLoading && <div className={`${styles.column1} ${styles.righted}`}>
+                        <Stack horizontal horizontalAlign="end" tokens={{ childrenGap: 15 }}>
+                            <DefaultButton disabled={isSaving} text="Delete" iconProps={{ iconName: "Delete" }} onClick={() => onDelete()} />
+                            <PrimaryButton disabled={isSaving} text="Save" iconProps={{ iconName: "Save" }} onClick={() => onSave()} />
+                        </Stack>
+                    </div>}
                 </div>
                 <div className={styles.row}>
-                    {editingSiteScript.Id && <div className={styles.half}>
+                    {getEditingSiteScript().Id && <div className={styles.half}>
                         <div className={styles.row}>
                             <div className={styles.column8}>
                                 <TextField
                                     label="Id"
                                     readOnly
-                                    value={editingSiteScript.Id} />
+                                    value={getEditingSiteScript().Id} />
                             </div>
                             <div className={styles.column4}>
                                 <TextField
                                     label="Version"
-                                    value={editingSiteScript.Version.toString()}
+                                    value={getEditingSiteScript().Version.toString()}
                                     onChange={onVersionChanged} />
                             </div>
                         </div>
@@ -181,13 +222,13 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
                     <div className={styles.half}>
                         <TextField
                             label="Description"
-                            value={editingSiteScript.Description}
+                            value={getEditingSiteScript().Description}
                             multiline={true}
-                            rows={1}
-                            autoAdjustHeight
+                            rows={2}
                             borderless
                             placeholder="Enter a description for the Site Script..."
-                            onChange={onDescriptionChanged}
+                            onChange={onDescriptionChanging}
+                            onBlur={onDescriptionInputBlur}
                         />
                     </div>
                 </div>
@@ -197,12 +238,12 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
                     </div>
                 </div>
                 <div className={styles.row}>
-                    <div className={styles.half}>
+                    <div className={styles.designerWorkspace}>
                         <SiteScriptDesigner
-                            siteScriptContent={editingSiteScript.Content}
+                            siteScriptContent={editingSiteScriptContent}
                             onSiteScriptContentUpdated={onSiteScriptContentUpdated} />
                     </div>
-                    <div className={styles.half}>
+                    <div className={styles.codeEditorWorkspace}>
                         <CodeEditor
                             height="80vh"
                             language="json"
@@ -213,7 +254,7 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
                                     enabled: false
                                 }
                             }}
-                            value={siteScriptContentToCodeString(editingSiteScript.Content)}
+                            value={siteScriptContentToCodeString(editingSiteScriptContent)}
                             editorDidMount={editorDidMount}
                         />
                     </div>

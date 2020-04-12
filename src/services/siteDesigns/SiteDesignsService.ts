@@ -3,6 +3,7 @@ import { ISiteDesign, WebTemplate, ISiteDesignWithGrantedRights } from '../../mo
 import { ServiceScope, ServiceKey } from '@microsoft/sp-core-library';
 import { SPHttpClient, ISPHttpClientOptions, SPHttpClientConfiguration } from '@microsoft/sp-http';
 import { assign } from '@microsoft/sp-lodash-subset';
+import { ISiteScriptSchemaService, SiteScriptSchemaServiceKey } from '../siteScriptSchema/SiteScriptSchemaService';
 
 export interface IGetSiteScriptFromWebOptions {
 	includeBranding?: boolean;
@@ -13,7 +14,7 @@ export interface IGetSiteScriptFromWebOptions {
 	includeLinksToExportedItems?: boolean;
 }
 
-export interface IGetSiteScriptFromWebResults {
+export interface IGetSiteScriptFromExistingResourceResult {
 	JSON: ISiteScriptContent;
 	Warnings: string[];
 }
@@ -29,15 +30,19 @@ export interface ISiteDesignsService {
 	saveSiteScript(siteScript: ISiteScript): Promise<void>;
 	deleteSiteScript(siteScript: ISiteScript | string): Promise<void>;
 	applySiteDesign(siteDesignId: string, webUrl: string): Promise<void>;
-	getSiteScriptFromList(listUrl: string): Promise<ISiteScriptContent>;
-	getSiteScriptFromWeb(webUrl: string, options?: IGetSiteScriptFromWebOptions): Promise<IGetSiteScriptFromWebResults>;
+	getSiteScriptFromList(listUrl: string): Promise<IGetSiteScriptFromExistingResourceResult>;
+	getSiteScriptFromWeb(webUrl: string, options?: IGetSiteScriptFromWebOptions): Promise<IGetSiteScriptFromExistingResourceResult>;
 }
 
 export class SiteDesignsService implements ISiteDesignsService {
 	private spHttpClient: SPHttpClient;
+	private schemaService: ISiteScriptSchemaService;
 
 	constructor(serviceScope: ServiceScope) {
-		this.spHttpClient = new SPHttpClient(serviceScope);
+		serviceScope.whenFinished(() => {
+			this.spHttpClient = serviceScope.consume(SPHttpClient.serviceKey);
+			this.schemaService = serviceScope.consume(SiteScriptSchemaServiceKey);
+		});
 	}
 
 	public baseUrl: string = '/';
@@ -203,12 +208,18 @@ export class SiteDesignsService implements ISiteDesignsService {
 		// TODO Implement
 		return null;
 	}
-	public getSiteScriptFromList(listUrl: string): Promise<ISiteScriptContent> {
+	public getSiteScriptFromList(listUrl: string): Promise<IGetSiteScriptFromExistingResourceResult> {
 		return this._restRequest('/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.GetSiteScriptFromList', {
 			listUrl
-		}).then(result => result as ISiteScriptContent);
+		}).then(result => {
+			console.log("result is : ", result);
+			const defaultContent = this.schemaService.getNewSiteScript();
+			const siteScriptContent = assign(defaultContent, JSON.parse(result.value)) as ISiteScriptContent;
+			siteScriptContent.$schema = "schema.json";
+			return { Warnings: [], JSON: siteScriptContent };
+		});
 	}
-	public getSiteScriptFromWeb(webUrl: string, options?: IGetSiteScriptFromWebOptions): Promise<IGetSiteScriptFromWebResults> {
+	public getSiteScriptFromWeb(webUrl: string, options?: IGetSiteScriptFromWebOptions): Promise<IGetSiteScriptFromExistingResourceResult> {
 		const info = {};
 		if (options) {
 			if (options.includeBranding === true || options.includeBranding === false) {
@@ -234,8 +245,8 @@ export class SiteDesignsService implements ISiteDesignsService {
 			webUrl,
 			info
 		}).then(result => {
-			console.log("Result is : ", result);
-			const siteScriptContent = JSON.parse(result.JSON) as ISiteScriptContent;
+			const defaultContent = this.schemaService.getNewSiteScript();
+			const siteScriptContent = assign(defaultContent, JSON.parse(result.JSON)) as ISiteScriptContent;
 			siteScriptContent.$schema = "schema.json";
 			return { Warnings: result.Warnings, JSON: siteScriptContent };
 		});

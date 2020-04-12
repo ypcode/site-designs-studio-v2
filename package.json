@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@microsoft/sp-core-library": "1.10.0",
+    "@microsoft/sp-dialog": "^1.10.0",
     "@microsoft/sp-lodash-subset": "1.10.0",
     "@microsoft/sp-office-ui-fabric-core": "1.10.0",
     "@microsoft/sp-property-pane": "1.10.0",
@@ -23,11 +24,12 @@
     "@types/react": "16.8.8",
     "@types/react-dom": "16.8.3",
     "@types/webpack-env": "1.13.1",
+    "@uifabric/react-hooks": "^7.1.2",
+    "ajv": "~5.2.2",
     "office-ui-fabric-react": "6.189.2",
     "react": "16.8.5",
     "react-dom": "16.8.5",
-    "react-sortable-hoc": "^1.11.0",
-    "ajv": "~5.2.2"
+    "react-sortable-hoc": "^1.11.0"
   },
   "resolutions": {
     "@types/react": "16.8.8"

@@ -4,7 +4,7 @@ import { assign, findIndex } from "@microsoft/sp-lodash-subset";
 import SiteDesignsMockData from "../../mock/SiteDesignsMock";
 import SiteScriptsMockData from "../../mock/SiteScriptsMock";
 import { ServiceScope } from "@microsoft/sp-core-library";
-import { ISiteDesignsService, IGetSiteScriptFromWebOptions, IGetSiteScriptFromWebResults } from "./SiteDesignsService";
+import { ISiteDesignsService, IGetSiteScriptFromWebOptions, IGetSiteScriptFromExistingResourceResult } from "./SiteDesignsService";
 
 const MockServiceDelay = 20;
 
@@ -106,15 +106,13 @@ export class MockSiteDesignsService implements ISiteDesignsService {
 	public applySiteDesign(siteDesignId: string, webUrl: string): Promise<void> {
 		return Promise.resolve();
 	}
-	public getSiteScriptFromList(listUrl: string): Promise<ISiteScriptContent> {
+	public getSiteScriptFromList(listUrl: string): Promise<IGetSiteScriptFromExistingResourceResult> {
 		return Promise.resolve({
-			actions: [],
-			bindata: {},
-			version: 1,
-			["$schema"]: "schema.json"
+			JSON: SiteScriptsMockData[0].Content,
+			Warnings: ["This is a fake exported site script from mock data"]
 		});
 	}
-	public getSiteScriptFromWeb(webUrl: string, options?: IGetSiteScriptFromWebOptions): Promise<IGetSiteScriptFromWebResults> {
+	public getSiteScriptFromWeb(webUrl: string, options?: IGetSiteScriptFromWebOptions): Promise<IGetSiteScriptFromExistingResourceResult> {
 		return Promise.resolve({
 			JSON: SiteScriptsMockData[0].Content,
 			Warnings: ["This is a fake exported site script from mock data"]

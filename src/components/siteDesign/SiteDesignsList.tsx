@@ -1,55 +1,36 @@
 import * as React from "react";
 import {
     DocumentCard,
-    DocumentCardActivity,
     DocumentCardPreview,
     DocumentCardDetails,
     DocumentCardTitle,
     IDocumentCardPreviewProps,
-    DocumentCardLocation,
     DocumentCardType
 } from 'office-ui-fabric-react/lib/DocumentCard';
 import { ImageFit } from 'office-ui-fabric-react/lib/Image';
 import { ISize } from 'office-ui-fabric-react/lib/Utilities';
 import { GridLayout } from "@pnp/spfx-controls-react/lib/GridLayout";
-import { IEditSiteDesignActionArgs, IGoToActionArgs, ActionType } from "../../app/IApplicationAction";
 import { ISiteDesign } from "../../models/ISiteDesign";
 import styles from "./SiteDesignsList.module.scss";
-import { useAppContext } from "../../app/App";
-import { IApplicationState } from "../../app/ApplicationState";
 import { Icon } from "office-ui-fabric-react/lib/Icon";
 import { Link } from "office-ui-fabric-react/lib/Link";
 
-export interface ISiteDesignsListProps {
+export interface ISiteDesignsListAllOptionalProps {
+    siteDesigns?: ISiteDesign[];
     preview?: boolean;
     addNewDisabled?: boolean;
+    onSiteDesignClicked?: (siteDesign: ISiteDesign) => void;
+    onAdd?: () => void;
+    onSeeMore?: () => void;
+}
+
+export interface ISiteDesignsListProps extends ISiteDesignsListAllOptionalProps {
+    siteDesigns: ISiteDesign[];
 }
 
 const PREVIEW_ITEMS_COUNT = 3;
 
 export const SiteDesignsList = (props: ISiteDesignsListProps) => {
-
-    const [appContext, executeAction] = useAppContext<IApplicationState, ActionType>();
-
-    const onSiteDesignClick = (siteDesign: ISiteDesign) => {
-        executeAction("EDIT_SITE_DESIGN", { siteDesign } as IEditSiteDesignActionArgs);
-    };
-
-
-    const onNewSiteDesignAdded = () => {
-        const siteDesign: ISiteDesign = {
-            Id: null,
-            Title: null,
-            Description: null,
-            Version: 1,
-            IsDefault: false,
-            PreviewImageAltText: null,
-            PreviewImageUrl: null,
-            SiteScriptIds: [],
-            WebTemplate: ""
-        };
-        executeAction("EDIT_SITE_DESIGN", { siteDesign } as IEditSiteDesignActionArgs);
-    };
 
     const renderGridItem = (siteDesign: ISiteDesign, finalSize: ISize, isCompact: boolean): JSX.Element => {
 
@@ -63,7 +44,7 @@ export const SiteDesignsList = (props: ISiteDesignsListProps) => {
             >
                 <DocumentCard
                     type={isCompact ? DocumentCardType.compact : DocumentCardType.normal}
-                    onClick={(ev: React.SyntheticEvent<HTMLElement>) => onNewSiteDesignAdded()}>
+                    onClick={(ev: React.SyntheticEvent<HTMLElement>) => props.onAdd && props.onAdd()}>
                     <div className={styles.iconBox}>
                         <div className={styles.icon}>
                             <Icon iconName="Add" />
@@ -91,7 +72,7 @@ export const SiteDesignsList = (props: ISiteDesignsListProps) => {
         >
             <DocumentCard
                 type={isCompact ? DocumentCardType.compact : DocumentCardType.normal}
-                onClick={(ev: React.SyntheticEvent<HTMLElement>) => onSiteDesignClick(siteDesign)}>
+                onClick={(ev: React.SyntheticEvent<HTMLElement>) => props.onSiteDesignClicked(siteDesign)}>
                 <DocumentCardPreview {...previewProps} />
                 <DocumentCardDetails>
                     <DocumentCardTitle
@@ -103,14 +84,14 @@ export const SiteDesignsList = (props: ISiteDesignsListProps) => {
         </div>;
     };
 
-    let items = [...appContext.allAvailableSiteDesigns];
+    let items = [...props.siteDesigns || []];
     if (props.preview) {
         items = items.slice(0, PREVIEW_ITEMS_COUNT);
     }
     if (!props.addNewDisabled) {
         items.push(null);
     }
-    const seeMore = props.preview && appContext.allAvailableSiteDesigns.length > PREVIEW_ITEMS_COUNT;
+    const seeMore = props.preview && props.siteDesigns && props.siteDesigns.length > PREVIEW_ITEMS_COUNT;
     return <div className={styles.SiteDesignsList}>
         <div className={styles.row}>
             <div className={styles.column}>
@@ -121,7 +102,7 @@ export const SiteDesignsList = (props: ISiteDesignsListProps) => {
                 />
                 {seeMore && <div className={styles.seeMore}>
                     {`There are more than ${PREVIEW_ITEMS_COUNT} available Site Designs on your tenant. `}
-                    <Link onClick={() => executeAction("GO_TO", { page: "SiteDesignsList" })}>See all Site Designs</Link>
+                    <Link onClick={() => props.onSeeMore && props.onSeeMore()}>See all Site Designs</Link>
                 </div>}
             </div>
         </div>

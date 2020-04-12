@@ -7,11 +7,11 @@ import { ActionType } from "../../app/IApplicationAction";
 import { GenericObjectEditor } from "../common/genericObjectEditor/GenericObjectEditor";
 import styles from "./SiteScriptDesigner.module.scss";
 import { Adder, IAddableItem } from "../common/Adder/Adder";
-import { IconButton, getId, Link } from "office-ui-fabric-react";
+import { IconButton, getId, Link, Label } from "office-ui-fabric-react";
 import { useState, useEffect } from "react";
-import { IPropertySchema } from "../../models/IPropertySchema";
 import { isEqual } from "@microsoft/sp-lodash-subset";
 import { getTrimmedText } from "../../utils/textUtils";
+import { useConstCallback } from "@uifabric/react-hooks";
 
 
 interface IEditingActionIndexes {
@@ -40,13 +40,10 @@ export const SiteScriptActionDesignerBlock = (props: ISiteScriptActionDesignerBl
     // Get service references
     const siteScriptSchemaService = appContext.serviceScope.consume(SiteScriptSchemaServiceKey);
 
-    const getActionSchemaFromProps = () => {
-        return props.parentSiteScriptAction ?
-            siteScriptSchemaService.getSubActionSchema(props.parentSiteScriptAction, props.siteScriptAction)
-            : siteScriptSchemaService.getActionSchema(props.siteScriptAction);
-    };
+    const actionSchema = props.parentSiteScriptAction ?
+        siteScriptSchemaService.getSubActionSchema(props.parentSiteScriptAction, props.siteScriptAction)
+        : siteScriptSchemaService.getActionSchema(props.siteScriptAction);
 
-    const [actionSchema, setActionSchema] = useState<IPropertySchema>(getActionSchemaFromProps());
     const [seeMore, setSeeMore] = useState<boolean>(false);
 
     const newSubActionKey = () => getId(`ScriptAction_${props.actionKey}_`);
@@ -55,15 +52,10 @@ export const SiteScriptActionDesignerBlock = (props: ISiteScriptActionDesignerBl
         ? getKeyedSubActionsCollection(props.siteScriptAction.subactions)
         : []);
 
+    const getActionDescription = (() => siteScriptSchemaService.getDescriptionFromActionSchema(actionSchema));
+    const getActionLabel = (() => siteScriptSchemaService.getLabelFromActionSchema(actionSchema));
 
-    // useEffect(() => {
-    //     setActionSchema(getActionSchemaFromProps());
-    // }, [props.siteScriptAction])
-
-    const getActionDescription = () => siteScriptSchemaService.getDescriptionFromActionSchema(actionSchema);
-    const getActionLabel = () => siteScriptSchemaService.getLabelFromActionSchema(actionSchema);
-
-    const onSubActionUpdated = (key: string, siteScriptAction: ISiteScriptAction) => {
+    const onSubActionUpdated = ((key: string, siteScriptAction: ISiteScriptAction) => {
         const updatedSubActions = keyedSubActions.map((keyedAction) => keyedAction.key == key ? { key, action: siteScriptAction } : keyedAction);
         setKeyedSubActions(updatedSubActions);
         const updated = {
@@ -71,9 +63,9 @@ export const SiteScriptActionDesignerBlock = (props: ISiteScriptActionDesignerBl
             subactions: updatedSubActions.map(sa => sa.action)
         };
         props.onSiteScriptActionUpdated(props.actionKey, updated);
-    };
+    });
 
-    const onSubActionRemoved = (key: string) => {
+    const onSubActionRemoved = ((key: string) => {
         const updatedSubActions = keyedSubActions.filter((keyedAction) => keyedAction.key != key);
         setKeyedSubActions(updatedSubActions);
         const updated = {
@@ -81,9 +73,9 @@ export const SiteScriptActionDesignerBlock = (props: ISiteScriptActionDesignerBl
             subactions: updatedSubActions.map(sa => sa.action)
         };
         props.onSiteScriptActionUpdated(props.actionKey, updated);
-    };
+    });
 
-    const onSubActionAdded = (verb: string) => {
+    const onSubActionAdded = ((verb: string) => {
         const newAction = siteScriptSchemaService.getNewActionFromVerb(verb);
         const updatedSubActions = [...keyedSubActions || [], { key: newSubActionKey(), action: newAction }];
         setKeyedSubActions(updatedSubActions);
@@ -92,9 +84,9 @@ export const SiteScriptActionDesignerBlock = (props: ISiteScriptActionDesignerBl
             subactions: updatedSubActions.map(sa => sa.action)
         };
         props.onSiteScriptActionUpdated(props.actionKey, updated);
-    };
+    });
 
-    const getAddableActions = () => {
+    const getAddableActions = (() => {
         const groupLabel = `${getActionLabel()} - Subactions`;
         return {
             [groupLabel]: siteScriptSchemaService.getAvailableSubActions(props.siteScriptAction).map(a => ({
@@ -105,28 +97,28 @@ export const SiteScriptActionDesignerBlock = (props: ISiteScriptActionDesignerBl
                 item: a
             } as IAddableItem))
         };
-    };
+    });
 
-    const toggleEdit = () => {
+    const toggleEdit = (() => {
         if (props.onEditingChanged) {
             props.onEditingChanged(!props.isEditing);
         }
-    };
+    });
 
-    const onSubActionEditingChanged = (isEditing: boolean, subActionIndex: number) => {
+    const onSubActionEditingChanged = ((isEditing: boolean, subActionIndex: number) => {
         if (props.onEditingChanged) {
             props.onEditingChanged(isEditing, subActionIndex);
         }
-    };
+    });
 
-    const getPropertiesAndValues = () => {
+    const getPropertiesAndValues = (() => {
         return Object.keys(actionSchema.properties).filter(p => p != "verb").map(p => ({
             title: actionSchema.properties[p].title,
             value: props.siteScriptAction[p]
         }));
-    };
+    });
 
-    const renderSummaryContent = () => {
+    const renderSummaryContent = (() => {
         const summaryValues = getPropertiesAndValues();
         if (!seeMore) {
             const previewSummary = summaryValues.slice(0, SEE_PROPERTIES_DEFAULT_COUNT);
@@ -140,7 +132,7 @@ export const SiteScriptActionDesignerBlock = (props: ISiteScriptActionDesignerBl
                 {summaryValues.map((pv, index) => <li key={`${props.actionKey}_prop_${index}`}>{pv.title}: <strong>{!pv.value ? "Not set" : pv.value}</strong></li>)}
             </ul>;
         }
-    };
+    });
 
 
     return <div className={`${styles.siteScriptAction} ${props.isEditing ? styles.isEditing : ""}`}>
@@ -160,13 +152,15 @@ export const SiteScriptActionDesignerBlock = (props: ISiteScriptActionDesignerBl
                 object={props.siteScriptAction}
                 schema={actionSchema}
                 customRenderers={{
-                    "subactions": () => <div className={styles.subactions}>{keyedSubActions.map((keyedSubAction, index) => <SiteScriptActionDesignerBlock key={keyedSubAction.key} actionKey={keyedSubAction.key}
-                        parentSiteScriptAction={props.siteScriptAction}
-                        siteScriptAction={keyedSubAction.action}
-                        onSiteScriptActionUpdated={onSubActionUpdated}
-                        onSiteScriptActionRemoved={onSubActionRemoved}
-                        isEditing={props.isEditing && props.isEditingSubActionIndex == index}
-                        onEditingChanged={(isEditing) => onSubActionEditingChanged(isEditing, index)} />)}
+                    "subactions": () => <div className={styles.subactions}>
+                        <Label>Subactions</Label>
+                        {keyedSubActions.map((keyedSubAction, index) => <SiteScriptActionDesignerBlock key={keyedSubAction.key} actionKey={keyedSubAction.key}
+                            parentSiteScriptAction={props.siteScriptAction}
+                            siteScriptAction={keyedSubAction.action}
+                            onSiteScriptActionUpdated={onSubActionUpdated}
+                            onSiteScriptActionRemoved={onSubActionRemoved}
+                            isEditing={props.isEditing && props.isEditingSubActionIndex == index}
+                            onEditingChanged={(isEditing) => onSubActionEditingChanged(isEditing, index)} />)}
                         <Adder items={getAddableActions()}
                             searchBoxPlaceholderText="Search a sub action..."
                             onSelectedItem={(item) => onSubActionAdded(item.key)} />
@@ -197,6 +191,7 @@ export const SiteScriptDesigner = (props: ISiteScriptDesignerProps) => {
     const [keyedActions, setKeyedActions] = useState<{ key: string; action: ISiteScriptAction }[]>(getKeyedActionsCollection((props.siteScriptContent && props.siteScriptContent.actions) || []));
 
     useEffect(() => {
+        console.log("Site script content changed");
         const actionsFromState = keyedActions.map(ka => ka.action);
         // Refresh the actions if updated from outsite
         if (props.siteScriptContent && !isEqual(props.siteScriptContent.actions, actionsFromState)) {
@@ -205,7 +200,7 @@ export const SiteScriptDesigner = (props: ISiteScriptDesignerProps) => {
         }
     }, [props.siteScriptContent]);
 
-    const onActionUpdated = (key: string, siteScriptAction: ISiteScriptAction) => {
+    const onActionUpdated = ((key: string, siteScriptAction: ISiteScriptAction) => {
         const updatedActions = keyedActions.map((keyedAction) => key == keyedAction.key ? { key, action: siteScriptAction } : keyedAction);
         setKeyedActions(updatedActions);
         const updated = {
@@ -213,9 +208,9 @@ export const SiteScriptDesigner = (props: ISiteScriptDesignerProps) => {
             actions: updatedActions.map(ka => ka.action)
         };
         props.onSiteScriptContentUpdated(updated);
-    };
+    });
 
-    const onActionAdded = (verb: string) => {
+    const onActionAdded = ((verb: string) => {
         const newAction = siteScriptSchemaService.getNewActionFromVerb(verb);
         const updatedActions = [...keyedActions, { key: newActionKey(), action: newAction }];
         setKeyedActions(updatedActions);
@@ -224,9 +219,9 @@ export const SiteScriptDesigner = (props: ISiteScriptDesignerProps) => {
             actions: updatedActions.map(ka => ka.action)
         };
         props.onSiteScriptContentUpdated(updated);
-    };
+    });
 
-    const onActionRemoved = (key: string) => {
+    const onActionRemoved = ((key: string) => {
         const updatedActions = keyedActions.filter((keyedAction) => key != keyedAction.key);
         setKeyedActions(updatedActions);
         const updated = {
@@ -236,9 +231,9 @@ export const SiteScriptDesigner = (props: ISiteScriptDesignerProps) => {
         // Clear all editions where an action is removed
         setEditingIndexes({ actionIndex: null, subActionIndex: null });
         props.onSiteScriptContentUpdated(updated);
-    };
+    });
 
-    const onEditingChanged = (isEditing: boolean, actionIndex: number, subActionIndex?: number) => {
+    const onEditingChanged = ((isEditing: boolean, actionIndex: number, subActionIndex?: number) => {
         if (isEditing) {
             setEditingIndexes({ actionIndex, subActionIndex });
         } else {
@@ -250,9 +245,9 @@ export const SiteScriptDesigner = (props: ISiteScriptDesignerProps) => {
                 }
             }
         }
-    };
+    });
 
-    const getAddableActions = () => {
+    const getAddableActions = useConstCallback(() => {
         return {
             "Actions": siteScriptSchemaService.getAvailableActions().map(a => ({
                 group: "Actions",
@@ -262,7 +257,7 @@ export const SiteScriptDesigner = (props: ISiteScriptDesignerProps) => {
                 item: a
             } as IAddableItem))
         };
-    };
+    });
 
     // TODO Implement orderable collection
     return <div className={styles.SiteScriptDesigner}>

@@ -38,7 +38,7 @@ export class SiteScriptSchemaService implements ISiteScriptSchemaService {
     private availableSubActionByVerb: { [key: string]: IActionDescriptor[] } = null;
     private availableActionSchemas: { [key: string]: IPropertySchema } = null;
     private availableSubActionSchemasByVerb: { [key: string]: { [subActionKey: string]: IPropertySchema } } = null;
-    private ajv = new (Ajv as any)({ schemaId: 'auto' });
+    private ajv = new (Ajv as any)({ schemaId: 'auto', extendRefs: true });
 
     constructor(private serviceScope: ServiceScope) { }
 

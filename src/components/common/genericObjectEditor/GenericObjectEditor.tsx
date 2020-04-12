@@ -1,10 +1,118 @@
 import * as React from 'react';
 import { useEffect, useState } from 'react';
-import { Dropdown, TextField, Toggle } from 'office-ui-fabric-react';
-import { IPropertySchema } from '../../../models/IPropertySchema';
+import { Dropdown, TextField, Toggle, IconButton, Stack, Label, IDropdownOption } from 'office-ui-fabric-react';
+import { IPropertySchema, IObjectSchema } from '../../../models/IPropertySchema';
+import { useConstCallback } from '@uifabric/react-hooks';
+
+export interface IPropertyEditorProps {
+    schema: IPropertySchema;
+    value: any;
+    label?: string;
+    required?: boolean;
+    readonly?: boolean;
+    onChange: (value: any) => void;
+}
+
+const getDefaulValueFromSchema = (schema: IPropertySchema) => {
+    if (schema) {
+        switch (schema.type) {
+            case 'string':
+                return '';
+            case 'boolean':
+                return false;
+            case 'number':
+                return 0;
+            case 'object':
+                return {};
+            default:
+                return null;
+        }
+    } else {
+        return null;
+    }
+};
+
+export function PropertyEditor(props: IPropertyEditorProps) {
+    let { schema,
+        label,
+        readonly,
+        required,
+        value,
+        onChange } = props;
+
+    const onDropdownChange = ((ev: any, v: IDropdownOption) => {
+        onChange(v.key);
+    });
+
+    const onInputChange = ((ev: any, v: any) => {
+        onChange(v);
+    });
+
+    if (schema.enum) {
+        if (schema.enum.length > 1 && !readonly) {
+            return (
+                <Dropdown
+                    required={required}
+                    label={label}
+                    selectedKey={value}
+                    options={schema.enum.map((p) => ({ key: p, text: p }))}
+                    onChange={onDropdownChange}
+                />
+            );
+        } else {
+            return (
+                <TextField
+                    label={label}
+                    value={value}
+                    readOnly={true}
+                    required={required}
+                    onChange={onInputChange}
+                />
+            );
+        }
+    } else {
+        switch (schema.type) {
+            case 'boolean':
+                return (
+                    <Toggle
+                        label={label}
+                        checked={value as boolean}
+                        disabled={readonly}
+                        onChange={onInputChange}
+                    />
+                );
+            case 'array':
+                return <>
+                    <Label>{label}</Label>
+                    <GenericArrayEditor
+                        object={value}
+                        schema={schema.items}
+                        onObjectChanged={onChange} />
+                </>;
+            case 'object': // TODO If object is a simple dictionary (key/non-complex object values) => Display a custom control
+                return <GenericObjectEditor
+                    object={value}
+                    schema={schema}
+                    onObjectChanged={onChange}
+                />;
+            case 'number':
+            case 'string':
+            default:
+                return (
+                    <TextField
+                        required={required}
+                        label={label}
+                        value={value}
+                        readOnly={readonly}
+                        onChange={onInputChange}
+                    />
+                );
+        }
+    }
+}
 
 export interface IGenericObjectEditorProps {
-    schema: any;
+    schema: IObjectSchema;
     object: any;
     defaultValues?: any;
     customRenderers?: any;
@@ -19,32 +127,51 @@ export interface IGenericObjectEditorProps {
 export interface IPropertyPlaceholderProps { propertyName: string; }
 export const PropertyPlaceholder = (props: IPropertyPlaceholderProps) => <></>;
 
-export const GenericObjectEditor = (props: IGenericObjectEditorProps) => {
+export function GenericArrayEditor(arrayEditorProps: IGenericObjectEditorProps) {
+
+    const onRemoved = ((index) => {
+        arrayEditorProps.onObjectChanged(arrayEditorProps.object.filter((_, i) => i != index));
+    });
+
+    const onAdded = (() => {
+        arrayEditorProps.onObjectChanged([...(arrayEditorProps.object||[]), getDefaulValueFromSchema(arrayEditorProps.schema)]);
+    });
+
+    const onUpdated = ((index, newValue) => {
+        arrayEditorProps.onObjectChanged(arrayEditorProps.object.map((o, i) => i == index ? newValue : o));
+    });
+
+    const renderItems = () => {
+        if (!arrayEditorProps.object) {
+            return null;
+        }
+
+        const items = arrayEditorProps.object as any[];
+        return items.map((item, index) => <>
+            <Stack horizontal>
+                <PropertyEditor key={index} value={item} schema={arrayEditorProps.schema} onChange={o => onUpdated(index, o)} />
+                <IconButton iconProps={{ iconName: 'Delete' }} onClick={() => onRemoved(index)} />
+            </Stack>
+        </>);
+    };
+
+    return <>
+        {renderItems()}
+        <IconButton iconProps={{ iconName: 'Add' }} onClick={onAdded} />
+    </>;
+}
+
+export function GenericObjectEditor(props: IGenericObjectEditorProps) {
 
     const [objectProperties, setObjectProperties] = useState<string[]>([]);
 
-    const getPropertyDefaultValueFromSchema = (propertyName: string) => {
-        let propSchema = props.schema.properties[propertyName];
-        if (propSchema) {
-            switch (propSchema.type) {
-                case 'string':
-                    return '';
-                case 'boolean':
-                    return false;
-                case 'number':
-                    return 0;
-                case 'object':
-                    return {};
-                default:
-                    return null;
-            }
-        } else {
-            return null;
-        }
+    const getPropertyDefaultValueFromSchema = (propertyName: string, componentProps: IGenericObjectEditorProps) => {
+        let propSchema = componentProps.schema.properties[propertyName];
+        return getDefaulValueFromSchema(propSchema);
     };
 
-    const getPropertyTypeFromSchema = (propertyName: string) => {
-        let propSchema = props.schema.properties[propertyName];
+    const getPropertyTypeFromSchema = (propertyName: string, componentProps: IGenericObjectEditorProps) => {
+        let propSchema = componentProps.schema.properties[propertyName];
         if (propSchema) {
             return propSchema.type;
         } else {
@@ -52,45 +179,45 @@ export const GenericObjectEditor = (props: IGenericObjectEditorProps) => {
         }
     };
 
-    const isPropertyReadOnly = (propertyName: string) => {
-        if (!props.readOnlyProperties || !props.readOnlyProperties.length) {
+    const isPropertyReadOnly = useConstCallback((propertyName: string, componentProps: IGenericObjectEditorProps) => {
+        if (!componentProps.readOnlyProperties || !componentProps.readOnlyProperties.length) {
             return false;
         }
 
-        return props.readOnlyProperties.indexOf(propertyName) > -1;
-    };
+        return componentProps.readOnlyProperties.indexOf(propertyName) > -1;
+    });
 
-    const onObjectPropertyChange = (propertyName: string, newValue: any) => {
-        if (!props.onObjectChanged) {
+    const onObjectPropertyChange = useConstCallback((propertyName: string, newValue: any, componentProps: IGenericObjectEditorProps) => {
+        if (!componentProps.onObjectChanged) {
             return;
         }
 
-        let propertyType = getPropertyTypeFromSchema(propertyName);
+        let propertyType = getPropertyTypeFromSchema(propertyName, componentProps);
         if (propertyType == 'number') {
             newValue = Number(newValue);
         }
-        const updatedObject = { ...props.object, [propertyName]: newValue };
+        const updatedObject = { ...componentProps.object, [propertyName]: newValue };
 
         // Set default values for properties of the argument object if not set
         objectProperties.forEach((p) => {
             // Get the property type
 
             let defaultValue =
-                props.defaultValues && props.defaultValues[p]
-                    ? props.defaultValues[p]
-                    : getPropertyDefaultValueFromSchema(p);
+                componentProps.defaultValues && componentProps.defaultValues[p]
+                    ? componentProps.defaultValues[p]
+                    : getPropertyDefaultValueFromSchema(p, componentProps);
 
             if (!updatedObject[p] && updatedObject[p] != false && updatedObject[p] != 0) {
                 updatedObject[p] = defaultValue;
             }
         });
 
-        props.onObjectChanged(updatedObject);
-    };
+        componentProps.onObjectChanged(updatedObject);
+    });
 
-    const getFieldLabel = (field: string, propertyDefinition?: IPropertySchema) => {
-        if (props.fieldLabelGetter) {
-            const foundLabel = props.fieldLabelGetter(field);
+    const getFieldLabel = useConstCallback((field: string, propertyDefinition: IPropertySchema, componentProps: IGenericObjectEditorProps) => {
+        if (componentProps.fieldLabelGetter) {
+            const foundLabel = componentProps.fieldLabelGetter(field);
             if (foundLabel) {
                 return foundLabel;
             }
@@ -105,12 +232,12 @@ export const GenericObjectEditor = (props: IGenericObjectEditorProps) => {
         if (propertyDefinition && propertyDefinition.title) {
             return propertyDefinition.title;
         } else {
-            return field;
+            return '';
         }
-    };
+    });
 
-    const renderPropertyEditor = (propertyName: string, propertySchema: IPropertySchema) => {
-        let { schema, customRenderers, defaultValues, object } = props;
+    const renderPropertyEditor = useConstCallback((propertyName: string, propertySchema: IPropertySchema, componentProps: IGenericObjectEditorProps) => {
+        let { schema, customRenderers, defaultValues, object } = componentProps;
 
         // Has custom renderer for the property
         if (customRenderers && customRenderers[propertyName]) {
@@ -125,78 +252,92 @@ export const GenericObjectEditor = (props: IGenericObjectEditorProps) => {
         let isPropertyRequired =
             (schema.required && schema.required.length && schema.required.indexOf(propertyName) > -1) || false;
 
-        if (propertySchema.enum) {
-            if (propertySchema.enum.length > 1 || !isPropertyReadOnly(propertyName)) {
-                return (
-                    <Dropdown
-                        required={isPropertyRequired}
-                        label={getFieldLabel(propertyName, propertySchema)}
-                        selectedKey={object[propertyName]}
-                        options={propertySchema.enum.map((p) => ({ key: p, text: p }))}
-                        onChanged={(value) => onObjectPropertyChange(propertyName, value.key)}
-                    />
-                );
-            } else {
-                return (
-                    <TextField
-                        label={getFieldLabel(propertyName, propertySchema)}
-                        value={object[propertyName]}
-                        readOnly={true}
-                        required={isPropertyRequired}
-                        onChange={(ev, value) => onObjectPropertyChange(propertyName, value)}
-                    />
-                );
-            }
-        } else {
-            switch (propertySchema.type) {
-                case 'boolean':
-                    return (
-                        <Toggle
-                            label={getFieldLabel(propertyName, propertySchema)}
-                            checked={object[propertyName] as boolean}
-                            disabled={isPropertyReadOnly(propertyName)}
-                            onChanged={(value) => onObjectPropertyChange(propertyName, value)}
-                        />
-                    );
-                case 'array': // TODO Render a ArrayEditor for compl
-                // case 'object': // TODO If object is a simple dictionary (key/non-complex object values) => Display a custom control
-                // 	return (
-                // 		<div>
-                // 			<div className="ms-Grid-row">
-                // 				<div className="ms-Grid-col ms-sm12">
-                // 					<Label>{this._getFieldLabel(propertyName)}</Label>
-                // 				</div>
-                // 			</div>
-                // 			<div className="ms-Grid-row">
-                // 				<div className="ms-Grid-col ms-sm2">
-                // 					<Icon iconName="InfoSolid" />
-                // 				</div>
-                // 				<div className="ms-Grid-col ms-sm10">
-                // 					{strings.PropertyIsComplexTypeMessage}
-                // 					<br />
-                // 					{strings.UseJsonEditorMessage}
-                // 				</div>
-                // 			</div>
-                // 		</div>
-                // 	);
-                case 'number':
-                case 'string':
-                default:
-                    return (
-                        <TextField
-                            required={isPropertyRequired}
-                            label={getFieldLabel(propertyName, propertySchema)}
-                            value={object[propertyName]}
-                            readOnly={isPropertyReadOnly(propertyName)}
-                            onChange={(ev, value) => onObjectPropertyChange(propertyName, value)}
-                        />
-                    );
-            }
-        }
-    };
 
-    const refreshObjectProperties = () => {
-        let { schema, ignoredProperties, defaultValues } = props;
+        return <PropertyEditor
+            value={object[propertyName]}
+            required={isPropertyRequired}
+            onChange={v => onObjectPropertyChange(propertyName, v, componentProps)}
+            label={getFieldLabel(propertyName, propertySchema, componentProps)}
+            schema={propertySchema}
+            readonly={isPropertyReadOnly(propertyName, componentProps)}
+        />;
+
+        // if (propertySchema.enum) {
+        //     if (propertySchema.enum.length > 1 || !isPropertyReadOnly(propertyName)) {
+        //         return (
+        //             <Dropdown
+        //                 required={isPropertyRequired}
+        //                 label={getFieldLabel(propertyName, propertySchema)}
+        //                 selectedKey={object[propertyName]}
+        //                 options={propertySchema.enum.map((p) => ({ key: p, text: p }))}
+        //                 onChange={(_, value) => onObjectPropertyChange(propertyName, value.key)}
+        //             />
+        //         );
+        //     } else {
+        //         return (
+        //             <TextField
+        //                 label={getFieldLabel(propertyName, propertySchema)}
+        //                 value={object[propertyName]}
+        //                 readOnly={true}
+        //                 required={isPropertyRequired}
+        //                 onChange={(_, value) => onObjectPropertyChange(propertyName, value)}
+        //             />
+        //         );
+        //     }
+        // } else {
+        //     switch (propertySchema.type) {
+        //         case 'boolean':
+        //             return (
+        //                 <Toggle
+        //                     label={getFieldLabel(propertyName, propertySchema)}
+        //                     checked={object[propertyName] as boolean}
+        //                     disabled={isPropertyReadOnly(propertyName)}
+        //                     onChange={(_, value) => onObjectPropertyChange(propertyName, value)}
+        //                 />
+        //             );
+        //         case 'array':
+        //             return <GenericArrayEditor
+        //                 object={object[propertyName]}
+        //                 schema={propertySchema.items}
+        //                 onObjectChanged={o => onObjectPropertyChange(propertyName, o)} />;
+        //         // case 'object': // TODO If object is a simple dictionary (key/non-complex object values) => Display a custom control
+        //         // 	return (
+        //         // 		<div>
+        //         // 			<div className="ms-Grid-row">
+        //         // 				<div className="ms-Grid-col ms-sm12">
+        //         // 					<Label>{this._getFieldLabel(propertyName)}</Label>
+        //         // 				</div>
+        //         // 			</div>
+        //         // 			<div className="ms-Grid-row">
+        //         // 				<div className="ms-Grid-col ms-sm2">
+        //         // 					<Icon iconName="InfoSolid" />
+        //         // 				</div>
+        //         // 				<div className="ms-Grid-col ms-sm10">
+        //         // 					{strings.PropertyIsComplexTypeMessage}
+        //         // 					<br />
+        //         // 					{strings.UseJsonEditorMessage}
+        //         // 				</div>
+        //         // 			</div>
+        //         // 		</div>
+        //         // 	);
+        //         case 'number':
+        //         case 'string':
+        //         default:
+        //             return (
+        //                 <TextField
+        //                     required={isPropertyRequired}
+        //                     label={getFieldLabel(propertyName, propertySchema)}
+        //                     value={object[propertyName]}
+        //                     readOnly={isPropertyReadOnly(propertyName)}
+        //                     onChange={(ev, value) => onObjectPropertyChange(propertyName, value)}
+        //                 />
+        //             );
+        //     }
+        // }
+    });
+
+    const refreshObjectProperties = useConstCallback((componentProps: IGenericObjectEditorProps) => {
+        let { schema, ignoredProperties } = componentProps;
 
         if (schema.type != 'object') {
             throw new Error('Cannot generate Object Editor from a non-object type');
@@ -211,11 +352,11 @@ export const GenericObjectEditor = (props: IGenericObjectEditorProps) => {
             refreshedObjectProperties = refreshedObjectProperties.filter((p) => ignoredProperties.indexOf(p) < 0);
         }
         setObjectProperties(refreshedObjectProperties);
-    };
+    });
 
     // Use effects
     useEffect(() => {
-        refreshObjectProperties();
+        refreshObjectProperties(props);
     }, [props.schema]);
 
     // TODO See if really needed
@@ -239,6 +380,22 @@ export const GenericObjectEditor = (props: IGenericObjectEditorProps) => {
     //     }
     // }
 
+    const renderChildrenRecursive = useConstCallback((node: any, editorProps: IGenericObjectEditorProps) => {
+        return React.Children.map(node.props.children, (c, i) => {
+            const asPlaceholder = c as React.ReactElement<IPropertyPlaceholderProps>;
+            if (asPlaceholder.type == PropertyPlaceholder) {
+                const propName = asPlaceholder.props.propertyName;
+                return renderPropertyEditor(propName, editorProps.schema.properties[propName], props);
+            } else {
+                if (React.Children.count(c.props.children) == 0) {
+                    return c;
+                } else {
+                    return React.cloneElement(c, { children: renderChildrenRecursive(c) });
+                }
+            }
+        });
+    });
+
     const render = () => {
         let { schema, ignoredProperties, object } = props;
         if (!object) {
@@ -251,28 +408,12 @@ export const GenericObjectEditor = (props: IGenericObjectEditorProps) => {
                 return;
             }
 
-            propertyEditors[p] = renderPropertyEditor(p, schema.properties[p]);
+            propertyEditors[p] = renderPropertyEditor(p, schema.properties[p], props);
         });
-
-        const renderChildrenRecursive = (node: any) => {
-            return React.Children.map(node.props.children, (c, i) => {
-                const asPlaceholder = c as React.ReactElement<IPropertyPlaceholderProps>;
-                if (asPlaceholder.type == PropertyPlaceholder) {
-                    const propName = asPlaceholder.props.propertyName;
-                    return renderPropertyEditor(propName, schema.properties[propName]);
-                } else {
-                    if (React.Children.count(c.props.children) == 0) {
-                        return c;
-                    } else {
-                        return React.cloneElement(c, { children: renderChildrenRecursive(c) });
-                    }
-                }
-            });
-        };
 
         if (React.Children.count(props.children) > 0) {
             return <>
-                {renderChildrenRecursive(render())}
+                {renderChildrenRecursive(render(), props)}
             </>;
         } else {
             return <>
@@ -282,4 +423,4 @@ export const GenericObjectEditor = (props: IGenericObjectEditorProps) => {
     };
 
     return render();
-};
+}

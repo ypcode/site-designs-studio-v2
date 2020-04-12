@@ -3,16 +3,17 @@ import { SortableContainer, SortableHandle, SortableElement } from 'react-sortab
 import { ISiteDesign, WebTemplate } from "../../models/ISiteDesign";
 import { useState, useEffect } from "react";
 import styles from "./SiteDesignEditor.module.scss";
-import { TextField, Dropdown, Label, ActionButton, PrimaryButton, DocumentCardPreview, ImageFit, IDocumentCardPreviewProps, Spinner, SpinnerType, Stack, Toggle } from "office-ui-fabric-react";
+import { TextField, Dropdown, Label, ActionButton, PrimaryButton, DocumentCardPreview, ImageFit, IDocumentCardPreviewProps, Spinner, SpinnerType, Stack, Toggle, DefaultButton, ProgressIndicator } from "office-ui-fabric-react";
 import { FilePicker, IFilePickerResult } from '@pnp/spfx-controls-react/lib/FilePicker';
 import { Placeholder } from "@pnp/spfx-controls-react/lib/Placeholder";
 import { useAppContext } from "../../app/App";
 import { IApplicationState } from "../../app/ApplicationState";
-import { ActionType, ISetAllAvailableSiteDesigns } from "../../app/IApplicationAction";
+import { ActionType, ISetAllAvailableSiteDesigns, IGoToActionArgs } from "../../app/IApplicationAction";
 import { Adder, IAddableItem } from "../common/Adder/Adder";
 import { SiteDesignsServiceKey } from "../../services/siteDesigns/SiteDesignsService";
 import { ISiteScript } from "../../models/ISiteScript";
 import { find } from "@microsoft/sp-lodash-subset";
+import { Confirm } from "../common/Confirm/Confirm";
 
 export interface ISiteDesignEditorProps {
     siteDesign: ISiteDesign;
@@ -193,6 +194,23 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
         setIsSaving(false);
     };
 
+    const onDelete = async () => {
+
+        if (!await Confirm.show({
+            title: `Delete Site Design`,
+            message: `Are you sure you want to delete ${editingSiteDesign.Title || "this Site Design"} ?`
+        })) {
+            return;
+        }
+
+        setIsSaving(true);
+        await siteDesignsService.deleteSiteDesign(editingSiteDesign);
+        const refreshedSiteDesigns = await siteDesignsService.getSiteDesigns();
+        execute("SET_ALL_AVAILABLE_SITE_DESIGNS", { siteDesigns: refreshedSiteDesigns } as ISetAllAvailableSiteDesigns);
+        execute("GO_TO", { page: "SiteDesignsList" } as IGoToActionArgs);
+        setIsSaving(false);
+    };
+
     const previewProps: IDocumentCardPreviewProps = {
         previewImages: [
             {
@@ -203,6 +221,7 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
         ]
     };
 
+    const isLoading = appContext.isLoading;
     return <div className={styles.SiteDesignEditor}>
         <div className={styles.row}>
             <div className={styles.columnLayout}>
@@ -225,14 +244,19 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
                             }}
                             placeholder="Enter the name of the Site Design..."
                             borderless
+                            readOnly={isLoading}
                             value={editingSiteDesign.Title}
                             onChange={onTitleChanged} />
+                        {isLoading && <ProgressIndicator />}
                     </div>
-                    <div className={`${styles.column1} ${styles.righted}`}>
-                        <PrimaryButton disabled={isSaving} text="Save" iconProps={{ iconName: "Save" }} onClick={() => onSave()} />
-                    </div>
+                    {!isLoading && <div className={`${styles.column1} ${styles.righted}`}>
+                        <Stack horizontal horizontalAlign="end" tokens={{ childrenGap: 15 }}>
+                            <DefaultButton disabled={isSaving} text="Delete" iconProps={{ iconName: "Delete" }} onClick={() => onDelete()} />
+                            <PrimaryButton disabled={isSaving} text="Save" iconProps={{ iconName: "Save" }} onClick={() => onSave()} />
+                        </Stack>
+                    </div>}
                 </div>
-                <div className={styles.row}>
+                {!isLoading && <div className={styles.row}>
                     <div className={styles.half}>
                         {editingSiteDesign.Id && <div className={styles.row}>
                             <div className={styles.column6}>
@@ -355,8 +379,8 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
                         </div>
 
                     </div>
-                </div>
+                </div>}
             </div>
         </div>
-    </div >;
+    </div>;
 };
