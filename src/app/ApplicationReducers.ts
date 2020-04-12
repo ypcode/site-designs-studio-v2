@@ -1,5 +1,5 @@
 import { IApplicationState } from "./ApplicationState";
-import { IEditSiteDesignActionArgs, ActionType, ISetAllAvailableSiteDesigns, ISetAllAvailableSiteScripts, IEditSiteScriptActionArgs, ISetLoadingArgs } from "./IApplicationAction";
+import { IEditSiteDesignActionArgs, ActionType, ISetAllAvailableSiteDesigns, ISetAllAvailableSiteScripts, IEditSiteScriptActionArgs, ISetLoadingArgs, ISetUserMessageArgs } from "./IApplicationAction";
 import { IAction } from "./App";
 
 export const Reducers: (applicationState: IApplicationState, action: IAction<ActionType>) => IApplicationState =
@@ -42,6 +42,11 @@ export const Reducers: (applicationState: IApplicationState, action: IAction<Act
                 return {
                     ...applicationState,
                     isLoading: (actionArgs as ISetLoadingArgs).loading
+                };
+            case "SET_USER_MESSAGE":
+                return {
+                    ...applicationState,
+                    userMessage: (actionArgs as ISetUserMessageArgs).userMessage
                 };
             default:
                 return applicationState;

@@ -1,10 +1,10 @@
 import * as React from "react";
 import { useState, useEffect, useRef } from "react";
 import styles from "./SiteScriptEditor.module.scss";
-import { TextField, PrimaryButton, Label, Spinner, SpinnerType, Slider, Stack, DefaultButton, ProgressIndicator } from "office-ui-fabric-react";
+import { TextField, PrimaryButton, Label, Spinner, SpinnerType, Slider, Stack, DefaultButton, ProgressIndicator, MessageBarType } from "office-ui-fabric-react";
 import { useAppContext } from "../../app/App";
 import { IApplicationState } from "../../app/ApplicationState";
-import { ActionType, ISetAllAvailableSiteScripts, IGoToActionArgs } from "../../app/IApplicationAction";
+import { ActionType, ISetAllAvailableSiteScripts, IGoToActionArgs, ISetUserMessageArgs } from "../../app/IApplicationAction";
 import { SiteScriptDesigner } from "./SiteScriptDesigner";
 import { SiteDesignsServiceKey } from "../../services/siteDesigns/SiteDesignsService";
 import { ISiteScript, ISiteScriptContent, ISiteScriptAction } from "../../models/ISiteScript";
@@ -96,10 +96,27 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
 
     const onSave = async () => {
         setIsSaving(true);
-        const toSave = { ...getEditingSiteScript(), Content: editingSiteScriptContent };
-        await siteDesignsService.saveSiteScript(toSave);
-        const refreshedSiteScripts = await siteDesignsService.getSiteScripts();
-        execute("SET_ALL_AVAILABLE_SITE_SCRIPTS", { siteScripts: refreshedSiteScripts } as ISetAllAvailableSiteScripts);
+        try {
+            const toSave = { ...getEditingSiteScript(), Content: editingSiteScriptContent };
+            await siteDesignsService.saveSiteScript(toSave);
+            const refreshedSiteScripts = await siteDesignsService.getSiteScripts();
+            execute("SET_USER_MESSAGE", {
+                userMessage: {
+                    message: `${getEditingSiteScript().Title} has been successfully saved.`,
+                    messageType: MessageBarType.success
+                }
+            } as ISetUserMessageArgs);
+            execute("SET_ALL_AVAILABLE_SITE_SCRIPTS", { siteScripts: refreshedSiteScripts } as ISetAllAvailableSiteScripts);
+        } catch (error) {
+            execute("SET_USER_MESSAGE", {
+                userMessage: {
+                    message: `${getEditingSiteScript().Title} could not be saved.`,
+                    messageType: MessageBarType.error
+                }
+            } as ISetUserMessageArgs);
+            console.error(error);
+        }
+
         setIsSaving(false);
     };
 
@@ -112,10 +129,26 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
         }
 
         setIsSaving(true);
-        await siteDesignsService.deleteSiteScript(editingSiteScriptRef.current);
-        const refreshedSiteScripts = await siteDesignsService.getSiteScripts();
-        execute("SET_ALL_AVAILABLE_SITE_SCRIPTS", { siteScripts: refreshedSiteScripts } as ISetAllAvailableSiteScripts);
-        execute("GO_TO", { page: "SiteScriptsList" } as IGoToActionArgs);
+        try {
+            await siteDesignsService.deleteSiteScript(editingSiteScriptRef.current);
+            const refreshedSiteScripts = await siteDesignsService.getSiteScripts();
+            execute("SET_USER_MESSAGE", {
+                userMessage: {
+                    message: `${getEditingSiteScript().Title} has been successfully deleted.`,
+                    messageType: MessageBarType.success
+                }
+            } as ISetUserMessageArgs);
+            execute("SET_ALL_AVAILABLE_SITE_SCRIPTS", { siteScripts: refreshedSiteScripts } as ISetAllAvailableSiteScripts);
+            execute("GO_TO", { page: "SiteScriptsList" } as IGoToActionArgs);
+        } catch (error) {
+            execute("SET_USER_MESSAGE", {
+                userMessage: {
+                    message: `${getEditingSiteScript().Title} could not be deleted.`,
+                    messageType: MessageBarType.error
+                }
+            } as ISetUserMessageArgs);
+            console.error(error);
+        }
         setIsSaving(false);
     };
 
@@ -167,9 +200,20 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
         });
     };
 
-    const isLoading = appContext.isLoading;
+    const isValidForSave: () => [boolean, string?] = () => {
+        const siteScript = getEditingSiteScript();
+        if (!siteScript) {
+            return [false, "Current Site Script not defined"];
+        }
 
-    console.log("RERENDER SiteScriptEditor");
+        if (!siteScript.Title) {
+            return [false, "Please set the title of the Site Script..."];
+        }
+
+        return [true];
+    };
+    
+    const isLoading = appContext.isLoading;
     return <div className={styles.SiteScriptEditor}>
         <div className={styles.row}>
             <div className={styles.columnLayout}>
@@ -198,7 +242,7 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
                     {!isLoading && <div className={`${styles.column1} ${styles.righted}`}>
                         <Stack horizontal horizontalAlign="end" tokens={{ childrenGap: 15 }}>
                             <DefaultButton disabled={isSaving} text="Delete" iconProps={{ iconName: "Delete" }} onClick={() => onDelete()} />
-                            <PrimaryButton disabled={isSaving} text="Save" iconProps={{ iconName: "Save" }} onClick={() => onSave()} />
+                            <PrimaryButton disabled={isSaving || !isValidForSave} text="Save" iconProps={{ iconName: "Save" }} onClick={() => onSave()} />
                         </Stack>
                     </div>}
                 </div>

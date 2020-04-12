@@ -3,17 +3,18 @@ import { SortableContainer, SortableHandle, SortableElement } from 'react-sortab
 import { ISiteDesign, WebTemplate } from "../../models/ISiteDesign";
 import { useState, useEffect } from "react";
 import styles from "./SiteDesignEditor.module.scss";
-import { TextField, Dropdown, Label, ActionButton, PrimaryButton, DocumentCardPreview, ImageFit, IDocumentCardPreviewProps, Spinner, SpinnerType, Stack, Toggle, DefaultButton, ProgressIndicator } from "office-ui-fabric-react";
+import { TextField, Dropdown, Label, ActionButton, PrimaryButton, DocumentCardPreview, ImageFit, IDocumentCardPreviewProps, Spinner, SpinnerType, Stack, Toggle, DefaultButton, ProgressIndicator, MessageBarType } from "office-ui-fabric-react";
 import { FilePicker, IFilePickerResult } from '@pnp/spfx-controls-react/lib/FilePicker';
 import { Placeholder } from "@pnp/spfx-controls-react/lib/Placeholder";
 import { useAppContext } from "../../app/App";
 import { IApplicationState } from "../../app/ApplicationState";
-import { ActionType, ISetAllAvailableSiteDesigns, IGoToActionArgs } from "../../app/IApplicationAction";
+import { ActionType, ISetAllAvailableSiteDesigns, IGoToActionArgs, ISetUserMessageArgs } from "../../app/IApplicationAction";
 import { Adder, IAddableItem } from "../common/Adder/Adder";
 import { SiteDesignsServiceKey } from "../../services/siteDesigns/SiteDesignsService";
 import { ISiteScript } from "../../models/ISiteScript";
 import { find } from "@microsoft/sp-lodash-subset";
 import { Confirm } from "../common/Confirm/Confirm";
+import { SiteDesignPreviewImageServiceKey } from "../../services/siteDesignPreviewImage/SiteDesignPreviewImageService";
 
 export interface ISiteDesignEditorProps {
     siteDesign: ISiteDesign;
@@ -34,11 +35,14 @@ interface ISortEndEventArgs {
 export const SiteDesignAssociatedScripts = (props: ISiteDesignAssociatedSiteScriptsProps) => {
     const [appContext, execute] = useAppContext<IApplicationState, ActionType>();
 
-    if (!appContext.allAvailableSiteScripts || appContext.allAvailableSiteScripts.length == 0) {
+    if (!appContext.allAvailableSiteScripts) {
         return <div>Loading site scripts...</div>;
     }
 
-    const selectedSiteScripts = props.siteDesign.SiteScriptIds.map(id => find(appContext.allAvailableSiteScripts, ss => ss.Id == id));
+    const selectedSiteScripts = props.siteDesign.SiteScriptIds
+        .map(id => find(appContext.allAvailableSiteScripts, ss => ss.Id == id))
+        // Ensure the associated scripts are still available
+        .filter(i => !!i);
     const adderItems: IAddableItem[] = appContext.allAvailableSiteScripts.filter(ss => props.siteDesign.SiteScriptIds.indexOf(ss.Id) < 0).map(item => ({
         iconName: "Script",
         group: null,
@@ -96,17 +100,10 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
 
     const [appContext, execute] = useAppContext<IApplicationState, ActionType>();
     const siteDesignsService = appContext.serviceScope.consume(SiteDesignsServiceKey);
+    const siteDesignPreviewImageService = appContext.serviceScope.consume(SiteDesignPreviewImageServiceKey);
 
     const [editingSiteDesign, setEditingSiteDesign] = useState<ISiteDesign>(props.siteDesign);
-    const [focusedField, setFocusedField] = useState<string>("");
     const [isSaving, setIsSaving] = useState<boolean>(false);
-    const [chosenFile, setChosenFile] = useState<IFilePickerResult>({
-        fileName: "",
-        fileAbsoluteUrl: "",
-        fileNameWithoutExtension: "",
-        spItemUrl: "",
-        downloadFileContent: null
-    });
 
     const setLoading = (loading: boolean) => {
         execute("SET_LOADING", { loading });
@@ -145,7 +142,7 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
     };
 
     const onPreviewImageRemoved = () => {
-        setEditingSiteDesign({ ...editingSiteDesign, PreviewImageUrl: null });
+        setEditingSiteDesign({ ...editingSiteDesign, PreviewImageUrl: "", PreviewImageAltText: "" });
     };
 
     const onVersionChanged = (ev: any, version: string) => {
@@ -186,11 +183,56 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
         setEditingSiteDesign({ ...editingSiteDesign, SiteScriptIds: reorderedSiteScriptIds });
     };
 
+    const onPreviewImageChanged = async (previewImageFile: IFilePickerResult) => {
+        if (previewImageFile.fileAbsoluteUrl) {
+            setEditingSiteDesign({ ...editingSiteDesign, PreviewImageUrl: previewImageFile.fileAbsoluteUrl });
+        } else {
+            const file: File = await previewImageFile.downloadFileContent();
+            // Will add the file in a "SiteDesignsPreviewImages" library in the current site
+            const serverUrl = `${document.location.protocol}//${document.location.host}`;
+            const uploadedFileUrl = await siteDesignPreviewImageService.uploadPreviewImageToCurrentSite(file);
+            const previewImageUrl = `${serverUrl}/${uploadedFileUrl}`;
+            setEditingSiteDesign({ ...editingSiteDesign, PreviewImageUrl: previewImageUrl });
+        }
+    };
+
+    const isValidForSave: () => [boolean, string?] = () => {
+        if (!editingSiteDesign) {
+            return [false, "Current Site Design not defined"];
+        }
+
+        if (!editingSiteDesign.Title) {
+            return [false, "Please set the title of the Site Design..."];
+        }
+
+        if (!editingSiteDesign.WebTemplate) {
+            return [false, "Please set the web template of the Site Design..."];
+        }
+
+        return [true];
+    };
+
     const onSave = async () => {
         setIsSaving(true);
-        await siteDesignsService.saveSiteDesign(editingSiteDesign);
-        const refreshedSiteDesigns = await siteDesignsService.getSiteDesigns();
-        execute("SET_ALL_AVAILABLE_SITE_DESIGNS", { siteDesigns: refreshedSiteDesigns } as ISetAllAvailableSiteDesigns);
+        try {
+            await siteDesignsService.saveSiteDesign(editingSiteDesign);
+            const refreshedSiteDesigns = await siteDesignsService.getSiteDesigns();
+            execute("SET_USER_MESSAGE", {
+                userMessage: {
+                    message: `${editingSiteDesign.Title} has been successfully saved.`,
+                    messageType: MessageBarType.success
+                }
+            } as ISetUserMessageArgs);
+            execute("SET_ALL_AVAILABLE_SITE_DESIGNS", { siteDesigns: refreshedSiteDesigns } as ISetAllAvailableSiteDesigns);
+        } catch (error) {
+            execute("SET_USER_MESSAGE", {
+                userMessage: {
+                    message: `${editingSiteDesign.Title} could not be deleted.`,
+                    messageType: MessageBarType.error
+                }
+            } as ISetUserMessageArgs);
+            console.error(error);
+        }
         setIsSaving(false);
     };
 
@@ -204,10 +246,27 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
         }
 
         setIsSaving(true);
-        await siteDesignsService.deleteSiteDesign(editingSiteDesign);
-        const refreshedSiteDesigns = await siteDesignsService.getSiteDesigns();
-        execute("SET_ALL_AVAILABLE_SITE_DESIGNS", { siteDesigns: refreshedSiteDesigns } as ISetAllAvailableSiteDesigns);
-        execute("GO_TO", { page: "SiteDesignsList" } as IGoToActionArgs);
+        try {
+            await siteDesignsService.deleteSiteDesign(editingSiteDesign);
+            const refreshedSiteDesigns = await siteDesignsService.getSiteDesigns();
+            execute("SET_USER_MESSAGE", {
+                userMessage: {
+                    message: `${editingSiteDesign.Title} has been successfully deleted.`,
+                    messageType: MessageBarType.success
+                }
+            } as ISetUserMessageArgs);
+            execute("SET_ALL_AVAILABLE_SITE_DESIGNS", { siteDesigns: refreshedSiteDesigns } as ISetAllAvailableSiteDesigns);
+            execute("GO_TO", { page: "SiteDesignsList" } as IGoToActionArgs);
+        } catch (error) {
+            execute("SET_USER_MESSAGE", {
+                userMessage: {
+                    message: `${editingSiteDesign.Title} could not be deleted.`,
+                    messageType: MessageBarType.error
+                }
+            } as ISetUserMessageArgs);
+            console.error(error);
+        }
+
         setIsSaving(false);
     };
 
@@ -222,14 +281,13 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
     };
 
     const isLoading = appContext.isLoading;
+    const [isValid, validationMessage] = isValidForSave();
     return <div className={styles.SiteDesignEditor}>
         <div className={styles.row}>
             <div className={styles.columnLayout}>
                 <div className={styles.row}>
                     <div className={styles.column11}>
                         <TextField
-                            onFocus={() => setFocusedField("Title")}
-                            onBlur={() => setFocusedField(null)}
                             styles={{
                                 field: {
                                     fontSize: "32px",
@@ -252,7 +310,7 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
                     {!isLoading && <div className={`${styles.column1} ${styles.righted}`}>
                         <Stack horizontal horizontalAlign="end" tokens={{ childrenGap: 15 }}>
                             <DefaultButton disabled={isSaving} text="Delete" iconProps={{ iconName: "Delete" }} onClick={() => onDelete()} />
-                            <PrimaryButton disabled={isSaving} text="Save" iconProps={{ iconName: "Save" }} onClick={() => onSave()} />
+                            <PrimaryButton disabled={isSaving || !isValid} title={!isValid && validationMessage} text="Save" iconProps={{ iconName: "Save" }} onClick={() => onSave()} />
                         </Stack>
                     </div>}
                 </div>
@@ -272,8 +330,6 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
                                         { key: WebTemplate.TeamSite.toString(), text: 'Team Site' },
                                         { key: WebTemplate.CommunicationSite.toString(), text: 'Communication Site' }
                                     ]}
-                                    onFocus={() => setFocusedField("WebTemplate")}
-                                    onBlur={() => setFocusedField(null)}
                                     selectedKey={editingSiteDesign.WebTemplate}
                                     onChanged={(v) => onWebTemplateChanged(v.key as string)}
                                 />
@@ -281,8 +337,6 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
                             <div className={styles.column2}>
                                 <TextField
                                     label="Version"
-                                    onFocus={() => setFocusedField("Version")}
-                                    onBlur={() => setFocusedField(null)}
                                     value={editingSiteDesign.Version.toString()}
                                     onChange={onVersionChanged} />
                             </div>
@@ -295,8 +349,6 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
                                         { key: WebTemplate.TeamSite.toString(), text: 'Team Site' },
                                         { key: WebTemplate.CommunicationSite.toString(), text: 'Communication Site' }
                                     ]}
-                                    onFocus={() => setFocusedField("WebTemplate")}
-                                    onBlur={() => setFocusedField(null)}
                                     selectedKey={editingSiteDesign.WebTemplate}
                                     onChanged={(v) => onWebTemplateChanged(v.key as string)}
                                 />
@@ -339,8 +391,7 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
                                 <FilePicker
                                     accepts={[".gif", ".jpg", ".jpeg", ".bmp", ".png"]}
                                     buttonIcon="FileImage"
-                                    onSave={setChosenFile}
-                                    onChanged={setChosenFile}
+                                    onSave={onPreviewImageChanged}
                                     buttonLabel={editingSiteDesign.PreviewImageUrl ? "Modify preview image" : "Add a preview image"}
                                     context={appContext.componentContext}
                                 />
@@ -357,8 +408,6 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
                             {editingSiteDesign.PreviewImageUrl && <TextField
                                 value={editingSiteDesign.PreviewImageAltText}
                                 borderless
-                                onFocus={() => setFocusedField("PreviewImageAltText")}
-                                onBlur={() => setFocusedField(null)}
                                 styles={{
                                     field: {
                                         fontSize: "16px",

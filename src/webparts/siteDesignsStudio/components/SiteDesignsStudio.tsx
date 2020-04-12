@@ -9,13 +9,14 @@ import { IApplicationState } from '../../../app/ApplicationState';
 import { App, useAppContext } from '../../../app/App';
 import { Reducers } from '../../../app/ApplicationReducers';
 import { ActionType, IGoToActionArgs, ISetAllAvailableSiteDesigns, ISetAllAvailableSiteScripts, IEditSiteDesignActionArgs, IEditSiteScriptActionArgs } from '../../../app/IApplicationAction';
-import {Debugger} from "../../../components/common/Debugger/Debugger";
+import { Debugger } from "../../../components/common/Debugger/Debugger";
 
 import { Nav, INavLink, INav } from 'office-ui-fabric-react/lib/Nav';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { SiteDesignsServiceKey } from '../../../services/siteDesigns/SiteDesignsService';
 import { Link } from 'office-ui-fabric-react/lib/Link';
+import { MessageBar } from 'office-ui-fabric-react/lib/MessageBar';
 
 const AppLayout = (props: any) => {
   const [appState, execute] = useAppContext<IApplicationState, ActionType>();
@@ -160,20 +161,21 @@ const AppLayout = (props: any) => {
 
 const AppPage = (props: any) => {
 
-  const [appContext, execute] = useAppContext<IApplicationState, ActionType>();
+  const [appContext, action] = useAppContext<IApplicationState, ActionType>();
 
   const siteDesignsService = appContext.serviceScope.consume(SiteDesignsServiceKey);
+  const userMessageTimeoutHandleRef = useRef(0);
 
   useEffect(() => {
     if (!appContext.allAvailableSiteDesigns || appContext.allAvailableSiteDesigns.length == 0) {
       siteDesignsService.getSiteDesigns().then(siteDesigns => {
-        execute("SET_ALL_AVAILABLE_SITE_DESIGNS", { siteDesigns } as ISetAllAvailableSiteDesigns);
+        action("SET_ALL_AVAILABLE_SITE_DESIGNS", { siteDesigns } as ISetAllAvailableSiteDesigns);
       });
     }
 
     if (!appContext.allAvailableSiteScripts || appContext.allAvailableSiteScripts.length == 0) {
       siteDesignsService.getSiteScripts().then(siteScripts => {
-        execute("SET_ALL_AVAILABLE_SITE_SCRIPTS", { siteScripts } as ISetAllAvailableSiteScripts);
+        action("SET_ALL_AVAILABLE_SITE_SCRIPTS", { siteScripts } as ISetAllAvailableSiteScripts);
       });
     }
   }, []);
@@ -195,9 +197,9 @@ const AppPage = (props: any) => {
     case "Home":
     default:
       content = <div>
-        <h2><Link onClick={() => execute("GO_TO", { page: "SiteDesignsList" })}>Site Deisgns</Link></h2>
+        <h2><Link onClick={() => action("GO_TO", { page: "SiteDesignsList" })}>Site Deisgns</Link></h2>
         <SiteDesignsListInContext preview />
-        <h2><Link onClick={() => execute("GO_TO", { page: "SiteScriptsList" })}>Site Scripts</Link></h2>
+        <h2><Link onClick={() => action("GO_TO", { page: "SiteScriptsList" })}>Site Scripts</Link></h2>
         <SiteScriptsList preview />
       </div>;
   }
@@ -206,7 +208,18 @@ const AppPage = (props: any) => {
     return <Debugger />;
   }
 
+
+  if (!userMessageTimeoutHandleRef.current && appContext.userMessage) {
+    userMessageTimeoutHandleRef.current = setTimeout(() => {
+      action("SET_USER_MESSAGE", { userMessage: null });
+      userMessageTimeoutHandleRef.current = null;
+    }, 5000);
+  }
+
   return <>
+    {appContext.userMessage && <MessageBar messageBarType={appContext.userMessage.messageType}>
+      {appContext.userMessage.message}
+    </MessageBar>}
     {content}
   </>;
 };

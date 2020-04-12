@@ -4,8 +4,14 @@ import { ActionType } from "./IApplicationAction";
 import { WebPartContext } from "@microsoft/sp-webpart-base";
 import { ISiteScript } from "../models/ISiteScript";
 import { ServiceScope } from "@microsoft/sp-core-library";
+import { MessageBarType } from "office-ui-fabric-react";
 
 export type Page = "Home" | "SiteDesignsList" | "SiteDesignEdition" | "SiteScriptsList" | "SiteScriptEdition";
+
+export interface IUserMessage {
+    message: string;
+    messageType: MessageBarType;
+}
 
 export interface IApplicationState extends IBaseAppState<ActionType> {
     page: Page;
@@ -16,6 +22,7 @@ export interface IApplicationState extends IBaseAppState<ActionType> {
     componentContext: WebPartContext;
     serviceScope: ServiceScope;
     isLoading: boolean;
+    userMessage: IUserMessage;
 }
 
 export const initialAppState: IApplicationState = {
@@ -26,5 +33,6 @@ export const initialAppState: IApplicationState = {
     serviceScope: null,
     allAvailableSiteDesigns: [],
     allAvailableSiteScripts: [],
-    isLoading: false
+    isLoading: false,
+    userMessage: null
 };
