@@ -6,6 +6,11 @@ It is designed to be used as an entire solution on a tenant to provision the cus
 
  > Still in beta release, a few other features are still under developement and not published yet
 
+### MPA
+
+- Build the package either in DEBUG or RELEASE config and add it to your app catalog
+- From a modern site home page, click New > Page > App > Site Designs Studio
+
 ### Building the code
 
 ```bash
