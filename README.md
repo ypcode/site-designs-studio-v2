@@ -1,6 +1,11 @@
-## site-designs-studio-v-2
+## site-designs-studio-v2
 
-This is where you include your WebPart documentation.
+The Site Design Studio v2 is a new version of the solution.
+It is now a single app part page instead a WebPart.
+It is designed to be used as an entire solution on a tenant to provision the customization and configuration to the sites allowing its users to create and manage Site Designs and Site Scripts without the need to write any Powershell nor JSON.
+
+!Important
+ > Still in beta release, a few other features are still under developement and not published yet
 
 ### Building the code
 
@@ -17,10 +22,3 @@ This package produces the following:
 * dist/* - the bundled script, along with other resources
 * deploy/* - all resources which should be uploaded to a CDN.
 
-### Build options
-
-gulp clean - TODO
-gulp test - TODO
-gulp serve - TODO
-gulp bundle - TODO
-gulp package-solution - TODO
