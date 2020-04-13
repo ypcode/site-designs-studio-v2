@@ -74,7 +74,8 @@
       margin-bottom: 7px;
     }
 
-    &:hover, &.isEditing {
+    &:hover,
+    &.isEditing {
       outline: 0px;
       border-color: $ms-themePrimary;
       transition: all 0.3s ease-in-out;
@@ -120,10 +121,8 @@
       opacity: 0;
       transition: opacity 1s ease-in-out;
       overflow: hidden;
-    }
 
-    &.isEditing {
-      .properties {
+      &.isEditing {
         max-height: unset;
         transition: opacity 1s ease-in-out;
         opacity: 1;

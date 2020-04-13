@@ -3,6 +3,7 @@ import { useAppContext } from "../../app/App";
 import { IApplicationState } from "../../app/ApplicationState";
 import { ISiteScriptContent, ISiteScriptAction } from "../../models/ISiteScript";
 import { SiteScriptSchemaServiceKey } from "../../services/siteScriptSchema/SiteScriptSchemaService";
+import { RenderingServiceKey } from "../../services/rendering/RenderingService";
 import { ActionType } from "../../app/IApplicationAction";
 import { GenericObjectEditor } from "../common/genericObjectEditor/GenericObjectEditor";
 import styles from "./SiteScriptDesigner.module.scss";
@@ -39,6 +40,7 @@ export const SiteScriptActionDesignerBlock = (props: ISiteScriptActionDesignerBl
 
     // Get service references
     const siteScriptSchemaService = appContext.serviceScope.consume(SiteScriptSchemaServiceKey);
+    const rendering = appContext.serviceScope.consume(RenderingServiceKey);
 
     const actionSchema = props.parentSiteScriptAction ?
         siteScriptSchemaService.getSubActionSchema(props.parentSiteScriptAction, props.siteScriptAction)
@@ -134,7 +136,7 @@ export const SiteScriptActionDesignerBlock = (props: ISiteScriptActionDesignerBl
         }
     });
 
-
+    const hasSubActions = props.siteScriptAction.subactions && props.siteScriptAction.subactions.length > 0;
     return <div className={`${styles.siteScriptAction} ${props.isEditing ? styles.isEditing : ""}`}>
         <h4 title={getActionDescription()}>
             {getActionLabel()}
@@ -146,8 +148,8 @@ export const SiteScriptActionDesignerBlock = (props: ISiteScriptActionDesignerBl
         <div className={`${styles.summary} ${props.isEditing ? styles.isEditing : styles.isNotEditing}`}>
             {renderSummaryContent()}
         </div>
-        <div className={styles.properties}>
-            <GenericObjectEditor
+        <div className={`${styles.properties} ${props.isEditing ? styles.isEditing : ""}`}>
+            {/* <GenericObjectEditor
                 ignoredProperties={["verb"]}
                 object={props.siteScriptAction}
                 schema={actionSchema}
@@ -167,7 +169,23 @@ export const SiteScriptActionDesignerBlock = (props: ISiteScriptActionDesignerBl
                     </div>
                 }}
                 onObjectChanged={(o) => props.onSiteScriptActionUpdated(props.actionKey, o as ISiteScriptAction)} >
-            </GenericObjectEditor>
+            </GenericObjectEditor> */}
+            {rendering.renderActionProperties(props.siteScriptAction,
+                props.parentSiteScriptAction,
+                (o) => props.onSiteScriptActionUpdated(props.actionKey, o as ISiteScriptAction))}
+            {hasSubActions && <div className={styles.subactions}>
+                <Label>Subactions</Label>
+                {keyedSubActions.map((keyedSubAction, index) => <SiteScriptActionDesignerBlock key={keyedSubAction.key} actionKey={keyedSubAction.key}
+                    parentSiteScriptAction={props.siteScriptAction}
+                    siteScriptAction={keyedSubAction.action}
+                    onSiteScriptActionUpdated={onSubActionUpdated}
+                    onSiteScriptActionRemoved={onSubActionRemoved}
+                    isEditing={props.isEditing && props.isEditingSubActionIndex == index}
+                    onEditingChanged={(isEditing) => onSubActionEditingChanged(isEditing, index)} />)}
+                <Adder items={getAddableActions()}
+                    searchBoxPlaceholderText="Search a sub action..."
+                    onSelectedItem={(item) => onSubActionAdded(item.key)} />
+            </div>}
         </div>
     </div>;
 };

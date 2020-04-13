@@ -3,6 +3,11 @@ import { WebPartContext } from "@microsoft/sp-webpart-base";
 import { SiteDesignsServiceKey } from "../services/siteDesigns/SiteDesignsService";
 import { MockSiteDesignsService } from "../services/siteDesigns/SiteDesignsMockService";
 import { SiteScriptSchemaServiceKey } from "../services/siteScriptSchema/SiteScriptSchemaService";
+import { RenderingServiceKey } from "../services/rendering/RenderingService";
+import { hubSitePickerRenderer } from "../components/propertyInputRenderers/HubSitePicker";
+import { appPickerRenderer } from "../components/propertyInputRenderers/AppPicker";
+import { themePickerRenderer } from "../components/propertyInputRenderers/ThemePicker";
+import { listTemplatePickerRenderer } from "../components/propertyInputRenderers/ListTemplatePicker";
 
 
 async function configureTestServices(webPartContext: WebPartContext): Promise<ServiceScope> {
@@ -44,6 +49,12 @@ async function configureProdServices(webPartContext: WebPartContext): Promise<Se
                 const siteScriptSchemaConfigPromise = siteScriptSchema.configure();
 
                 Promise.all([siteScriptSchemaConfigPromise]).then(() => {
+                    // The schema service must be configured before the customization config can be done
+                    const rendering = childScope.consume(RenderingServiceKey);
+                    rendering.customizeActionPropertyRendering("joinHubSite", null, "hubSiteId", hubSitePickerRenderer);
+                    rendering.customizeActionPropertyRendering("installSolution", null, "id", appPickerRenderer);
+                    rendering.customizeActionPropertyRendering("applyTheme", null, "themeName", themePickerRenderer);
+                    rendering.customizeActionPropertyRendering("createSPList", null, "templateType", listTemplatePickerRenderer);
                     resolve();
                 }).catch(error => {
                     reject(error);

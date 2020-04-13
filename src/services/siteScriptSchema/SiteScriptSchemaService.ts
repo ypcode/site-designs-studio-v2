@@ -19,6 +19,7 @@ export interface ISiteScriptSchemaService {
     getNewActionFromVerb(verb: string): ISiteScriptAction;
     getSiteScriptSchema(): any;
     getActionSchema(action: ISiteScriptAction): IPropertySchema;
+    getActionSchemaByVerb(actionVerb: string): IPropertySchema;
     getActionTitle(action: ISiteScriptAction, parentAction?: ISiteScriptAction): string;
     getActionTitleByVerb(actionVerb: string, parentActionVerb?: string): string;
     getLabelFromActionSchema(actionSchema: IPropertySchema): string;
@@ -257,10 +258,10 @@ export class SiteScriptSchemaService implements ISiteScriptSchemaService {
     }
 
     public getActionSchema(action: ISiteScriptAction): IPropertySchema {
-        return this._getActionSchemaByVerb(action.verb);
+        return this.getActionSchemaByVerb(action.verb);
     }
 
-    private _getActionSchemaByVerb(actionVerb: string): any {
+    public getActionSchemaByVerb(actionVerb: string): IPropertySchema {
         if (!this.isConfigured) {
             throw new Error(
                 'The Schema Service is not properly configured. Make sure the configure() method has been called.'
@@ -285,7 +286,7 @@ export class SiteScriptSchemaService implements ISiteScriptSchemaService {
     public getActionTitleByVerb(actionVerb: string, parentActionVerb: string): string {
         let actionSchema = parentActionVerb
             ? this.getSubActionSchemaByVerbs(parentActionVerb, actionVerb)
-            : this._getActionSchemaByVerb(actionVerb);
+            : this.getActionSchemaByVerb(actionVerb);
         return actionSchema.title;
     }
     public getActionDescription(action: ISiteScriptAction, parentAction: ISiteScriptAction): string {
@@ -294,7 +295,7 @@ export class SiteScriptSchemaService implements ISiteScriptSchemaService {
     public getActionDescriptionByVerb(actionVerb: string, parentActionVerb: string): string {
         let actionSchema = parentActionVerb
             ? this.getSubActionSchemaByVerbs(parentActionVerb, actionVerb)
-            : this._getActionSchemaByVerb(actionVerb);
+            : this.getActionSchemaByVerb(actionVerb);
         return actionSchema.description;
     }
 
