@@ -16,8 +16,8 @@ export interface ILabelResolver {
 
 export interface IRenderingService {
     customizeActionPropertyRendering(mainActionVerb: string, subActionVerb: string, propertyName: string, renderer: IRenderer, labelResolver?: ILabelResolver): void;
-    renderActionProperty(siteScriptAction: ISiteScriptAction, parentSiteScriptAction: ISiteScriptAction, propertyName: string, value: any, onChanged: (value: any) => void): JSX.Element;
-    renderActionProperties(siteScriptAction: ISiteScriptAction, parentSiteScriptAction: ISiteScriptAction, onActionChange: (scriptAction: ISiteScriptAction) => void): JSX.Element;
+    renderActionProperty(siteScriptAction: ISiteScriptAction, parentSiteScriptAction: ISiteScriptAction, propertyName: string, value: any, onChanged: (value: any) => void, ignoredProperties: string[]): JSX.Element;
+    renderActionProperties(siteScriptAction: ISiteScriptAction, parentSiteScriptAction: ISiteScriptAction, onActionChange: (scriptAction: ISiteScriptAction) => void, ignoredProperties: string[]): JSX.Element;
 }
 
 interface IActionPropertyRenderingOptions {
@@ -133,7 +133,7 @@ class RenderingService implements IRenderingService {
         }
     }
 
-    public renderActionProperty(siteScriptAction: ISiteScriptAction, parentSiteScriptAction: ISiteScriptAction, propertyName: string, value: any, onChanged: (value: any) => void): JSX.Element {
+    public renderActionProperty(siteScriptAction: ISiteScriptAction, parentSiteScriptAction: ISiteScriptAction, propertyName: string, value: any, onChanged: (value: any) => void, ignoredProperties: string[]): JSX.Element {
         if (!siteScriptAction) {
             throw new Error("action verb is not defined");
         }
@@ -151,7 +151,7 @@ class RenderingService implements IRenderingService {
                 {subactions.map((sa, index) => this.renderActionProperties(sa, siteScriptAction, (changedSubAction) => {
                     const updatedSubActions = (subactions).map((usa, updatedIndex) => updatedIndex == index ? changedSubAction : usa);
                     onChanged(updatedSubActions);
-                }))}
+                }, ignoredProperties))}
             </>;
         }
 
@@ -174,52 +174,60 @@ class RenderingService implements IRenderingService {
         const propertySchema = actionSchema.properties[propertyName];
         const propertyLabel = this._getActionPropertyLabel(mainActionVerb, subActionVerb, propertyName, propertySchema);
         let content: JSX.Element = null;
+        // Get the rendering config for main action (if any)
         const mainActionRenderingConfig = this._registeredActionPropertyRenderingOptions[mainActionVerb];
-        if (!mainActionRenderingConfig) {
-
-            content = <PropertyEditor
-                value={siteScriptAction[propertyName]}
-                required={isPropertyRequired}
-                onChange={onChanged}
-                label={propertyLabel}
-                schema={propertySchema}
-            />;
-        } else {
-            if (subActionVerb) {
-                const subActionRenderingConfig = this._registeredActionPropertyRenderingOptions[mainActionVerb].subactions[subActionVerb];
-                if (subActionRenderingConfig.propertyName == propertyName) {
-                    content = subActionRenderingConfig.renderer(propertyLabel, value, onChanged);
-                }
-                else {
-                    content = <PropertyEditor
-                        value={siteScriptAction[propertyName]}
-                        required={isPropertyRequired}
-                        onChange={onChanged}
-                        label={propertyLabel}
-                        schema={propertySchema} />;
-                }
+        if (subActionVerb) {
+            // If the current action is a subaction
+            // Get the rendering config for sub action (if any)
+            const subActionRenderingConfig = mainActionRenderingConfig
+                && mainActionRenderingConfig.subactions
+                && mainActionRenderingConfig.subactions[subActionVerb];
+            // If there is no rendering config for current action and property
+            if (!subActionRenderingConfig || subActionRenderingConfig.propertyName != propertyName) {
+                // Use default property editor
+                content = <PropertyEditor
+                    value={siteScriptAction[propertyName]}
+                    required={isPropertyRequired}
+                    onChange={onChanged}
+                    label={propertyLabel}
+                    schema={propertySchema}
+                />;
             } else {
-                if (mainActionRenderingConfig.propertyName == propertyName) {
-                    content = mainActionRenderingConfig.renderer(propertyLabel, value, onChanged);
-                } else {
-                    content = <PropertyEditor
-                        value={siteScriptAction[propertyName]}
-                        required={isPropertyRequired}
-                        onChange={onChanged}
-                        label={propertyLabel}
-                        schema={propertySchema} />;
-                }
+                // Otherwise, use the specified renderer
+                content = subActionRenderingConfig.renderer(propertyLabel, value, onChanged);
+            }
+        } else {
+            // If the current action is a main action
+            // If there is no rendering config for current action and property
+            if (!mainActionRenderingConfig || mainActionRenderingConfig.propertyName != propertyName) {
+                // Use default property editor
+                content = <PropertyEditor
+                    value={siteScriptAction[propertyName]}
+                    required={isPropertyRequired}
+                    onChange={onChanged}
+                    label={propertyLabel}
+                    schema={propertySchema}
+                />;
+            } else {
+                // Otherwise, use the specified renderer
+                content = mainActionRenderingConfig.renderer(propertyLabel, value, onChanged);
             }
         }
         return content;
     }
 
-    public renderActionProperties(siteScriptAction: ISiteScriptAction, parentSiteScriptAction: ISiteScriptAction, onActionChange: (scriptAction: ISiteScriptAction) => void): JSX.Element {
+    public renderActionProperties(siteScriptAction: ISiteScriptAction, parentSiteScriptAction: ISiteScriptAction, onActionChange: (scriptAction: ISiteScriptAction) => void, ignoredProperties: string[]): JSX.Element {
+        ignoredProperties = ignoredProperties || ['verb', 'subactions'];
+
+        const actionSchema = parentSiteScriptAction
+            ? this._ensureSubActionPropertySchema(parentSiteScriptAction.verb, siteScriptAction.verb)
+            : this._ensureActionPropertySchema(siteScriptAction.verb);
+
         return <>
-            {Object.keys(siteScriptAction).filter(p => p != "verb" && p != "subactions").map(p => this.renderActionProperty(siteScriptAction, parentSiteScriptAction, p, siteScriptAction[p], v => {
+            {Object.keys(actionSchema.properties).filter(p => ignoredProperties.indexOf(p) < 0).map(p => this.renderActionProperty(siteScriptAction, parentSiteScriptAction, p, siteScriptAction[p], v => {
                 const updated = { ...siteScriptAction, [p]: v };
                 onActionChange(updated);
-            }))}
+            }, ignoredProperties))}
         </>;
     }
 }

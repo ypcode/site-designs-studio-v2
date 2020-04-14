@@ -12,11 +12,17 @@ export interface IActionDescriptor {
     description: string;
 }
 
+export interface IPropertyValuePair {
+    property: string;
+    value: any;
+}
+
 export interface ISiteScriptSchemaService {
     configure(schemaJSONorURL?: string, forceReconfigure?: boolean): Promise<any>;
     validateSiteScriptJson(json: string): boolean;
     getNewSiteScript(): ISiteScriptContent;
     getNewActionFromVerb(verb: string): ISiteScriptAction;
+    getNewSubActionFromVerb(parentVerb: string, verb: string): ISiteScriptAction;
     getSiteScriptSchema(): any;
     getActionSchema(action: ISiteScriptAction): IPropertySchema;
     getActionSchemaByVerb(actionVerb: string): IPropertySchema;
@@ -30,6 +36,8 @@ export interface ISiteScriptSchemaService {
     getSubActionSchema(parentAction: ISiteScriptAction, subAction: ISiteScriptAction): IPropertySchema;
     getAvailableActions(): IActionDescriptor[];
     getAvailableSubActions(parentAction: ISiteScriptAction): IActionDescriptor[];
+    getPropertiesAndValues(action: ISiteScriptAction, parentAction?: ISiteScriptAction): IPropertyValuePair[];
+    hasSubActions(action: ISiteScriptAction): boolean;
 }
 
 export class SiteScriptSchemaService implements ISiteScriptSchemaService {
@@ -195,7 +203,8 @@ export class SiteScriptSchemaService implements ISiteScriptSchemaService {
     }
 
     public validateSiteScriptJson(json: string): boolean {
-        let valid = this.ajv.validate(this.schema, json);
+        const parsedJson = JSON.parse(json);
+        let valid = this.ajv.validate(this.schema, parsedJson);
         if (!valid) {
             console.error('Schema errors: ', this.ajv.errors);
             return false;
@@ -225,6 +234,8 @@ export class SiteScriptSchemaService implements ISiteScriptSchemaService {
                     return 0;
                 case 'object':
                     return {};
+                case 'array':
+                    return [];
                 default:
                     if (propSchema.enum && propSchema.enum.length) {
                         return propSchema.enum[0];
@@ -243,10 +254,29 @@ export class SiteScriptSchemaService implements ISiteScriptSchemaService {
         };
         let actionSchema = this.getActionSchema(newAction);
 
-        // Add default values for properties of the action
+        // Add default values for required properties of the action
         if (actionSchema && actionSchema.properties) {
             Object.keys(actionSchema.properties)
-                .filter((p) => p != 'verb')
+                .filter((p) => p != 'verb' && (p == 'subaction' || !actionSchema.required || actionSchema.required.indexOf(p) >= 0))
+                .forEach((p) => (newAction[p] = this._getPropertyDefaultValueFromSchema(actionSchema, p)));
+        }
+
+        return newAction;
+    }
+
+    public getNewSubActionFromVerb(parentVerb: string, verb: string): ISiteScriptAction {
+        let parentAction: ISiteScriptAction = {
+            verb: parentVerb
+        };
+        let newAction: ISiteScriptAction = {
+            verb: verb
+        };
+        let actionSchema = this.getSubActionSchema(parentAction, newAction);
+
+        // Add default values for required properties of the action
+        if (actionSchema && actionSchema.properties) {
+            Object.keys(actionSchema.properties)
+                .filter((p) => p != 'verb' && (!actionSchema.required || actionSchema.required.indexOf(p) >= 0))
                 .forEach((p) => (newAction[p] = this._getPropertyDefaultValueFromSchema(actionSchema, p)));
         }
 
@@ -283,15 +313,18 @@ export class SiteScriptSchemaService implements ISiteScriptSchemaService {
     public getActionTitle(action: ISiteScriptAction, parentAction: ISiteScriptAction): string {
         return this.getActionTitleByVerb(action.verb, parentAction && parentAction.verb);
     }
+    
     public getActionTitleByVerb(actionVerb: string, parentActionVerb: string): string {
         let actionSchema = parentActionVerb
             ? this.getSubActionSchemaByVerbs(parentActionVerb, actionVerb)
             : this.getActionSchemaByVerb(actionVerb);
         return actionSchema.title;
     }
+    
     public getActionDescription(action: ISiteScriptAction, parentAction: ISiteScriptAction): string {
         return this.getActionDescriptionByVerb(action.verb, parentAction && parentAction.verb);
     }
+
     public getActionDescriptionByVerb(actionVerb: string, parentActionVerb: string): string {
         let actionSchema = parentActionVerb
             ? this.getSubActionSchemaByVerbs(parentActionVerb, actionVerb)
@@ -318,6 +351,7 @@ export class SiteScriptSchemaService implements ISiteScriptSchemaService {
         let subActionSchemaKey = foundKeys.length == 1 ? foundKeys[0] : null;
         return availableSubActionSchemas[subActionSchemaKey];
     }
+
     public getSubActionSchema(parentAction: ISiteScriptAction, subAction: ISiteScriptAction): any {
         return this.getSubActionSchemaByVerbs(parentAction.verb, subAction.verb);
     }
@@ -383,6 +417,36 @@ export class SiteScriptSchemaService implements ISiteScriptSchemaService {
             let httpClient: HttpClient = this.serviceScope.consume(HttpClient.serviceKey);
             return httpClient.get(url, HttpClient.configurations.v1).then((v) => v.json());
         }
+    }
+
+    public getPropertiesAndValues(action: ISiteScriptAction, parentAction?: ISiteScriptAction): IPropertyValuePair[] {
+        if (!action) {
+            return [];
+        }
+
+        const actionSchema = parentAction
+            ? this.getSubActionSchema(parentAction, action)
+            : this.getActionSchema(action);
+
+        return Object.keys(actionSchema.properties).filter(p => p != "verb").map(p => (p == "subactions"
+            ? {
+                property: actionSchema.properties[p].title,
+                value: `${(action.subactions && action.subactions.length) || 0} subactions`
+            }
+            : {
+                property: actionSchema.properties[p].title,
+                value: action[p]
+            }));
+    }
+
+    public hasSubActions(action: ISiteScriptAction): boolean {
+        const actionSchema = this.getActionSchema(action);
+        if (!actionSchema) {
+            console.warn(`Action schema could not be resolved for verb ${action.verb}`);
+            return false;
+        }
+
+        return Object.keys(actionSchema.properties).indexOf("subactions") >= 0;
     }
 }
 
