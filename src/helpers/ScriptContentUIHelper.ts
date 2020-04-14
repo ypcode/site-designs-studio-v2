@@ -26,6 +26,8 @@ export interface ISiteScriptContentUIWrapper {
     removeSubAction(parentAction: ISiteScriptActionUIWrapper, action: ISiteScriptActionUIWrapper): ISiteScriptContentUIWrapper;
     toggleEditing(action: ISiteScriptActionUIWrapper, parentAction?: ISiteScriptActionUIWrapper): ISiteScriptContentUIWrapper;
     replaceAction(action: ISiteScriptActionUIWrapper): ISiteScriptContentUIWrapper;
+    reorderActions(newIndex: number, oldIndex: number): ISiteScriptContentUIWrapper;
+    reorderSubActions(parentActionKey: string, newIndex: number, oldIndex: number): ISiteScriptContentUIWrapper;
 }
 
 interface IKeyCounters {
@@ -154,6 +156,28 @@ export class SiteScriptContentUIWrapper implements ISiteScriptContentUIWrapper {
             ...(a.$uiKey == action.$uiKey ? action : a),
             subactions: a.subactions && a.subactions.map(sa => ({ ...(sa.$uiKey == action.$uiKey ? action : sa) }))
         }));
+        return cloned;
+    }
+
+    public reorderActions(newIndex: number, oldIndex: number): ISiteScriptContentUIWrapper {
+        const cloned = this.clone();
+        const actionToMove = cloned.actions[oldIndex];
+        cloned.actions.splice(oldIndex, 1);
+        cloned.actions.splice(newIndex, 0, actionToMove);
+        return cloned;
+    }
+
+    public reorderSubActions(parentActionKey: string, newIndex: number, oldIndex: number): ISiteScriptContentUIWrapper {
+        const cloned = this.clone();
+        const parentAction = find(cloned.actions, a => a.$uiKey == parentActionKey);
+        if (!parentAction || !parentAction.subactions) {
+            console.warn(`Parent action could not be found with key ${parentActionKey}`);
+            return;
+        }
+
+        const actionToMove = parentAction.subactions[oldIndex];
+        parentAction.subactions.splice(oldIndex, 1);
+        parentAction.subactions.splice(newIndex, 0, actionToMove);
         return cloned;
     }
 

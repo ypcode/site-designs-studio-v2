@@ -224,6 +224,10 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
                 }
             } as ISetUserMessageArgs);
             execute("SET_ALL_AVAILABLE_SITE_DESIGNS", { siteDesigns: refreshedSiteDesigns } as ISetAllAvailableSiteDesigns);
+            // If it is a brand new design, force redirect to the script list
+            if (!editingSiteDesign.Id) {
+                execute("GO_TO", { page: "SiteDesignsList" } as IGoToActionArgs);
+            }
         } catch (error) {
             execute("SET_USER_MESSAGE", {
                 userMessage: {

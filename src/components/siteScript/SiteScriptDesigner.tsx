@@ -6,14 +6,20 @@ import { RenderingServiceKey } from "../../services/rendering/RenderingService";
 import { ActionType } from "../../app/IApplicationAction";
 import styles from "./SiteScriptDesigner.module.scss";
 import { Adder, IAddableItem } from "../common/Adder/Adder";
-import { IconButton, Link, Label } from "office-ui-fabric-react";
+import { IconButton, Link, Label, Icon, Stack } from "office-ui-fabric-react";
 import { useState, useEffect } from "react";
 import { getTrimmedText } from "../../utils/textUtils";
 import { useConstCallback } from "@uifabric/react-hooks";
 import { ISiteScriptContentUIWrapper, ISiteScriptActionUIWrapper, SiteScriptContentUIWrapper } from "../../helpers/ScriptContentUIHelper";
 import { ISiteScriptContent } from "../../models/ISiteScript";
 import { usePrevious } from "../../helpers/hooks";
+import { SortableElement, SortableHandle, SortableContainer } from "react-sortable-hoc";
 
+interface ISortEndEventArgs {
+    oldIndex: number;
+    newIndex: number;
+    collection: any[];
+}
 
 export interface ISiteScriptActionDesignerBlockProps {
     siteScriptAction: ISiteScriptActionUIWrapper;
@@ -90,6 +96,31 @@ export const SiteScriptActionDesignerBlock = (props: ISiteScriptActionDesignerBl
         }
     });
 
+    const DragHandle = SortableHandle(() => (
+        <div>
+            <Icon iconName="SwitcherStartEnd" />
+        </div>
+    ));
+
+    const onSubActionSortChanged = (args: ISortEndEventArgs) => {
+        props.onSiteScriptContentUIChanged(props.siteScriptContentUI.reorderSubActions(props.siteScriptAction.$uiKey, args.newIndex, args.oldIndex));
+    };
+
+
+    const renderScriptSubAction = (scriptActionUI: ISiteScriptActionUIWrapper, index: number) => {
+        const SortableItem = SortableElement(({ value: subAction }) => <SiteScriptActionDesignerBlock key={subAction.$uiKey}
+            parentSiteScriptAction={props.siteScriptAction}
+            siteScriptAction={subAction}
+            siteScriptContentUI={props.siteScriptContentUI}
+            onSiteScriptContentUIChanged={props.onSiteScriptContentUIChanged} />);
+
+        return <SortableItem key={scriptActionUI.$uiKey} value={scriptActionUI} index={index} />;
+    };
+
+    const SubactionsSortableListContainer = SortableContainer(({ items }) => {
+        return <div>{items.map(renderScriptSubAction)}</div>;
+    });
+
     const hasSubActions = siteScriptSchemaService.hasSubActions(props.siteScriptAction);
     const isEditing = props.siteScriptContentUI.editingActionKeys.indexOf(props.siteScriptAction.$uiKey) >= 0;
     return <div className={`${styles.siteScriptAction} ${isEditing ? styles.isEditing : ""}`}>
@@ -97,8 +128,11 @@ export const SiteScriptActionDesignerBlock = (props: ISiteScriptActionDesignerBl
             {getActionLabel()}
         </h4>
         <div className={styles.tools}>
-            <IconButton iconProps={{ iconName: isEditing ? "Accept" : "Edit" }} onClick={() => toggleEdit()} />
-            {!isEditing && <IconButton iconProps={{ iconName: "Delete" }} onClick={() => onActionRemoved(props.siteScriptAction, props.parentSiteScriptAction)} />}
+            <Stack horizontal tokens={{ childrenGap: 3 }}>
+                {!isEditing && <DragHandle />}
+                <IconButton iconProps={{ iconName: isEditing ? "Accept" : "Edit" }} onClick={() => toggleEdit()} />
+                {!isEditing && <IconButton iconProps={{ iconName: "Delete" }} onClick={() => onActionRemoved(props.siteScriptAction, props.parentSiteScriptAction)} />}
+            </Stack>
         </div>
         <div className={`${styles.summary} ${isEditing ? styles.isEditing : styles.isNotEditing}`}>
             {renderSummaryContent()}
@@ -109,11 +143,11 @@ export const SiteScriptActionDesignerBlock = (props: ISiteScriptActionDesignerBl
                 (o) => onActionUpdated({ ...props.siteScriptAction, ...o } as ISiteScriptActionUIWrapper), ['verb', 'subactions', '$uiKey', '$isEditing'])}
             {hasSubActions && <div className={styles.subactions}>
                 <Label>Subactions</Label>
-                {props.siteScriptAction.subactions && props.siteScriptAction.subactions.map((subAction) => <SiteScriptActionDesignerBlock key={subAction.$uiKey}
-                    parentSiteScriptAction={props.siteScriptAction}
-                    siteScriptAction={subAction}
-                    siteScriptContentUI={props.siteScriptContentUI}
-                    onSiteScriptContentUIChanged={props.onSiteScriptContentUIChanged} />)}
+                {props.siteScriptAction.subactions && <SubactionsSortableListContainer items={props.siteScriptAction.subactions}
+                    // onSortStart={(args) => this._onSortStart(args)}
+                    onSortEnd={(args: any) => onSubActionSortChanged(args)}
+                    lockToContainerEdges={true}
+                    useDragHandle={true} />}
                 <Adder items={getAddableActions()}
                     searchBoxPlaceholderText="Search a sub action..."
                     onSelectedItem={(item) => onActionAdded(item.key, props.siteScriptAction)} />
@@ -184,13 +218,34 @@ export const SiteScriptDesigner = (props: ISiteScriptDesignerProps) => {
         };
     });
 
-    // TODO Implement orderable collection
-    return <div className={styles.SiteScriptDesigner}>
-        {contentUI.actions && contentUI.actions.map(action => <SiteScriptActionDesignerBlock key={action.$uiKey}
+    const onSortChanged = (args: ISortEndEventArgs) => {
+        props.onSiteScriptContentUpdated(contentUI.reorderActions(args.newIndex, args.oldIndex).toSiteScriptContent());
+    };
+
+
+    const renderScriptAction = (scriptActionUI: ISiteScriptActionUIWrapper, index: number) => {
+        const SortableItem = SortableElement(({ value: action }) => <SiteScriptActionDesignerBlock key={action.$uiKey}
             siteScriptAction={action}
             siteScriptContentUI={contentUI}
             onSiteScriptContentUIChanged={onUIUpdated}
-        />)}
+        />);
+
+        return <SortableItem key={scriptActionUI.$uiKey} value={scriptActionUI} index={index} />;
+    };
+
+    const SortableListContainer = SortableContainer(({ items }) => {
+        return <div>{items.map(renderScriptAction)}</div>;
+    });
+
+    // TODO Implement orderable collection
+    return <div className={styles.SiteScriptDesigner}>
+        {contentUI.actions && <SortableListContainer
+            items={contentUI.actions}
+            // onSortStart={(args) => this._onSortStart(args)}
+            onSortEnd={(args: any) => onSortChanged(args)}
+            lockToContainerEdges={true}
+            useDragHandle={true}
+        />}
         <Adder items={getAddableActions()}
             searchBoxPlaceholderText="Search an action..."
             onSelectedItem={(item) => onActionAdded(item.key)} />

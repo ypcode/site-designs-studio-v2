@@ -101,6 +101,10 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
                 }
             } as ISetUserMessageArgs);
             execute("SET_ALL_AVAILABLE_SITE_SCRIPTS", { siteScripts: refreshedSiteScripts } as ISetAllAvailableSiteScripts);
+            // If it is a brand new script, force redirect to the script list
+            if (!editingSiteScript.Id) {
+                execute("GO_TO", {page:"SiteScriptsList"} as IGoToActionArgs);
+            }
         } catch (error) {
             execute("SET_USER_MESSAGE", {
                 userMessage: {
