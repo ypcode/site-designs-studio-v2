@@ -25,6 +25,7 @@ export interface ISiteScriptContentUIWrapper {
     addSubAction(parentAction: ISiteScriptActionUIWrapper, action: ISiteScriptAction): ISiteScriptContentUIWrapper;
     removeSubAction(parentAction: ISiteScriptActionUIWrapper, action: ISiteScriptActionUIWrapper): ISiteScriptContentUIWrapper;
     toggleEditing(action: ISiteScriptActionUIWrapper, parentAction?: ISiteScriptActionUIWrapper): ISiteScriptContentUIWrapper;
+    clearEditing(exceptedKeys?: string[]): ISiteScriptContentUIWrapper;
     replaceAction(action: ISiteScriptActionUIWrapper): ISiteScriptContentUIWrapper;
     reorderActions(newIndex: number, oldIndex: number): ISiteScriptContentUIWrapper;
     reorderSubActions(parentActionKey: string, newIndex: number, oldIndex: number): ISiteScriptContentUIWrapper;
@@ -147,6 +148,12 @@ export class SiteScriptContentUIWrapper implements ISiteScriptContentUIWrapper {
             // Add the current action to edition
             cloned.editingActionKeys.push(action.$uiKey);
         }
+        return cloned;
+    }
+
+    public clearEditing(exceptedKeys: string[]): ISiteScriptContentUIWrapper {
+        const cloned = this.clone();
+        cloned.editingActionKeys = exceptedKeys ? cloned.editingActionKeys.filter(k => exceptedKeys.indexOf(k) >= 0) : [];
         return cloned;
     }
 

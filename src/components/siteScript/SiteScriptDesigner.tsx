@@ -25,6 +25,9 @@ export interface ISiteScriptActionDesignerBlockProps {
     siteScriptAction: ISiteScriptActionUIWrapper;
     parentSiteScriptAction?: ISiteScriptActionUIWrapper;
     siteScriptContentUI: ISiteScriptContentUIWrapper;
+    isSorting: boolean;
+    index: number;
+    actionsCount: number;
     onSiteScriptContentUIChanged: (siteScriptContent: ISiteScriptContentUIWrapper) => void;
 }
 
@@ -39,6 +42,8 @@ export const SiteScriptActionDesignerBlock = (props: ISiteScriptActionDesignerBl
     const siteScriptSchemaService = appContext.serviceScope.consume(SiteScriptSchemaServiceKey);
     const rendering = appContext.serviceScope.consume(RenderingServiceKey);
     const [seeMore, setSeeMore] = useState<boolean>(false);
+    const [isSortingSubactions, setIsSortingSubactions] = useState<boolean>(false);
+
 
     const getActionDescription = () => siteScriptSchemaService.getActionDescription(props.siteScriptAction, props.parentSiteScriptAction);
     const getActionLabel = () => siteScriptSchemaService.getActionTitle(props.siteScriptAction, props.parentSiteScriptAction);
@@ -96,45 +101,87 @@ export const SiteScriptActionDesignerBlock = (props: ISiteScriptActionDesignerBl
         }
     });
 
-    const DragHandle = SortableHandle(() => (
+    const DragHandle = SortableHandle(() =>
         <div>
-            <Icon iconName="SwitcherStartEnd" />
+            <Icon iconName={props.index === (props.actionsCount - 1) ? "SortUp" : props.index === 0 ? "SortDown" : "Sort"} />
         </div>
-    ));
+    );
 
     const onSubActionSortChanged = (args: ISortEndEventArgs) => {
         props.onSiteScriptContentUIChanged(props.siteScriptContentUI.reorderSubActions(props.siteScriptAction.$uiKey, args.newIndex, args.oldIndex));
     };
 
 
-    const renderScriptSubAction = (scriptActionUI: ISiteScriptActionUIWrapper, index: number) => {
-        const SortableItem = SortableElement(({ value: subAction }) => <SiteScriptActionDesignerBlock key={subAction.$uiKey}
-            parentSiteScriptAction={props.siteScriptAction}
-            siteScriptAction={subAction}
-            siteScriptContentUI={props.siteScriptContentUI}
-            onSiteScriptContentUIChanged={props.onSiteScriptContentUIChanged} />);
-
-        return <SortableItem key={scriptActionUI.$uiKey} value={scriptActionUI} index={index} />;
+    const toggleSortingSubactions = () => {
+        if (!isSortingSubactions) {
+            setTimeout(() => {
+                props.onSiteScriptContentUIChanged(props.siteScriptContentUI.clearEditing([props.parentSiteScriptAction.$uiKey]));
+            }, 0);
+        }
+        setIsSortingSubactions(!isSortingSubactions);
     };
 
-    const SubactionsSortableListContainer = SortableContainer(({ items }) => {
-        return <div>{items.map(renderScriptSubAction)}</div>;
-    });
+    const renderScriptSubAction = (scriptActionUI: ISiteScriptActionUIWrapper, index: number) => {
+
+        const scriptActionBlock = <SiteScriptActionDesignerBlock key={scriptActionUI.$uiKey}
+            siteScriptAction={scriptActionUI}
+            parentSiteScriptAction={props.siteScriptAction}
+            siteScriptContentUI={props.siteScriptContentUI}
+            onSiteScriptContentUIChanged={props.onSiteScriptContentUIChanged}
+            isSorting={isSortingSubactions}
+            index={index}
+            actionsCount={(props.siteScriptAction
+                && props.siteScriptAction.subactions
+                && props.siteScriptAction.subactions.length) || 0}
+        />;
+
+        if (isSortingSubactions) {
+            const SortableItem = SortableElement(() => scriptActionBlock);
+            return <SortableItem key={scriptActionUI.$uiKey} index={index} />;
+        } else {
+            return scriptActionBlock;
+        }
+    };
+
+    const renderScriptSubActionsList = () => {
+        if (!props.siteScriptAction.subactions) {
+            return null;
+        }
+
+        if (isSortingSubactions) {
+            const SortableListContainer = SortableContainer(({ items }) => {
+                return <div>{items.map(renderScriptSubAction)}</div>;
+            });
+
+            return <SortableListContainer
+                items={props.siteScriptAction.subactions}
+                // onSortStart={(args) => this._onSortStart(args)}
+                onSortEnd={(args: any) => onSubActionSortChanged(args)}
+                lockToContainerEdges={true}
+                useDragHandle={false}
+            />;
+        } else {
+            return <div>{props.siteScriptAction.subactions.map(renderScriptSubAction)}</div>;
+        }
+    };
+
+
 
     const hasSubActions = siteScriptSchemaService.hasSubActions(props.siteScriptAction);
     const isEditing = props.siteScriptContentUI.editingActionKeys.indexOf(props.siteScriptAction.$uiKey) >= 0;
-    return <div className={`${styles.siteScriptAction} ${isEditing ? styles.isEditing : ""}`}>
+    return <div className={`${styles.siteScriptAction} ${isEditing ? styles.isEditing : ""} ${props.isSorting ? styles.isSorting : ''}`}>
         <h4 title={getActionDescription()}>
-            {getActionLabel()}
+            {props.isSorting && <span className={styles.sortIndex}>{props.index + 1}</span>}
+            <span className={styles.actionLabelText}>{getActionLabel()}</span>
         </h4>
         <div className={styles.tools}>
             <Stack horizontal tokens={{ childrenGap: 3 }}>
-                {!isEditing && <DragHandle />}
-                <IconButton iconProps={{ iconName: isEditing ? "Accept" : "Edit" }} onClick={() => toggleEdit()} />
-                {!isEditing && <IconButton iconProps={{ iconName: "Delete" }} onClick={() => onActionRemoved(props.siteScriptAction, props.parentSiteScriptAction)} />}
+                {!isEditing && props.isSorting && <DragHandle />}
+                {!props.isSorting && <IconButton iconProps={{ iconName: isEditing ? "Accept" : "Edit" }} onClick={() => toggleEdit()} />}
+                {!props.isSorting && !isEditing && <IconButton iconProps={{ iconName: "Delete" }} onClick={() => onActionRemoved(props.siteScriptAction, props.parentSiteScriptAction)} />}
             </Stack>
         </div>
-        <div className={`${styles.summary} ${isEditing ? styles.isEditing : styles.isNotEditing}`}>
+        <div className={`${styles.summary} ${!isEditing || isSortingSubactions ? styles.isNotEditing : styles.isEditing}`}>
             {renderSummaryContent()}
         </div>
         {isEditing && <div className={`${styles.properties} ${isEditing ? styles.isEditing : ""}`}>
@@ -142,15 +189,21 @@ export const SiteScriptActionDesignerBlock = (props: ISiteScriptActionDesignerBl
                 props.parentSiteScriptAction,
                 (o) => onActionUpdated({ ...props.siteScriptAction, ...o } as ISiteScriptActionUIWrapper), ['verb', 'subactions', '$uiKey', '$isEditing'])}
             {hasSubActions && <div className={styles.subactions}>
-                <Label>Subactions</Label>
-                {props.siteScriptAction.subactions && <SubactionsSortableListContainer items={props.siteScriptAction.subactions}
-                    // onSortStart={(args) => this._onSortStart(args)}
-                    onSortEnd={(args: any) => onSubActionSortChanged(args)}
-                    lockToContainerEdges={true}
-                    useDragHandle={true} />}
-                <Adder items={getAddableActions()}
+                <div className={styles.row}>
+                    <div className={styles.column10}>
+                        <Label>Subactions</Label>
+                    </div>
+                    <div className={styles.column2}>
+                        {props.siteScriptAction.subactions && props.siteScriptAction.subactions.length > 1 && <IconButton iconProps={{ iconName: "Sort" }}
+                            // styles={{ root: { position: "absolute", top: -32, right: 9 } }}
+                            checked={isSortingSubactions}
+                            onClick={toggleSortingSubactions} />}
+                    </div>
+                </div>
+                {renderScriptSubActionsList()}
+                {!isSortingSubactions && <Adder items={getAddableActions()}
                     searchBoxPlaceholderText="Search a sub action..."
-                    onSelectedItem={(item) => onActionAdded(item.key, props.siteScriptAction)} />
+                    onSelectedItem={(item) => onActionAdded(item.key, props.siteScriptAction)} />}
             </div>}
         </div>}
     </div>;
@@ -166,6 +219,7 @@ export const SiteScriptDesigner = (props: ISiteScriptDesignerProps) => {
 
     // Get service references
     const siteScriptSchemaService = appContext.serviceScope.consume(SiteScriptSchemaServiceKey);
+    const [isSorting, setIsSorting] = useState<boolean>(false);
     const [contentUI, setContentUI] = useState<ISiteScriptContentUIWrapper>(new SiteScriptContentUIWrapper(props.siteScriptContent));
     const previousContentUI = usePrevious<ISiteScriptContentUIWrapper>(contentUI);
     const updateUITimeoutRef = React.useRef<any>(null);
@@ -222,32 +276,64 @@ export const SiteScriptDesigner = (props: ISiteScriptDesignerProps) => {
         props.onSiteScriptContentUpdated(contentUI.reorderActions(args.newIndex, args.oldIndex).toSiteScriptContent());
     };
 
-
-    const renderScriptAction = (scriptActionUI: ISiteScriptActionUIWrapper, index: number) => {
-        const SortableItem = SortableElement(({ value: action }) => <SiteScriptActionDesignerBlock key={action.$uiKey}
-            siteScriptAction={action}
-            siteScriptContentUI={contentUI}
-            onSiteScriptContentUIChanged={onUIUpdated}
-        />);
-
-        return <SortableItem key={scriptActionUI.$uiKey} value={scriptActionUI} index={index} />;
+    const toggleSorting = () => {
+        if (!isSorting) {
+            setTimeout(() => {
+                setContentUI(contentUI.clearEditing());
+            }, 0);
+        }
+        setIsSorting(!isSorting);
     };
 
-    const SortableListContainer = SortableContainer(({ items }) => {
-        return <div>{items.map(renderScriptAction)}</div>;
-    });
+    const renderScriptAction = (scriptActionUI: ISiteScriptActionUIWrapper, index: number) => {
 
-    // TODO Implement orderable collection
+        const scriptActionBlock = <SiteScriptActionDesignerBlock key={scriptActionUI.$uiKey}
+            siteScriptAction={scriptActionUI}
+            siteScriptContentUI={contentUI}
+            onSiteScriptContentUIChanged={onUIUpdated}
+            isSorting={isSorting}
+            index={index}
+            actionsCount={(contentUI.actions || 0) && contentUI.actions.length}
+        />;
+
+        if (isSorting) {
+            const SortableItem = SortableElement(() => scriptActionBlock);
+            return <SortableItem key={scriptActionUI.$uiKey} index={index} />;
+        } else {
+            return scriptActionBlock;
+        }
+    };
+
+    const renderScriptActionsList = () => {
+        if (!contentUI.actions) {
+            return null;
+        }
+
+        if (isSorting) {
+            const SortableListContainer = SortableContainer(({ items }) => {
+                return <div>{items.map(renderScriptAction)}</div>;
+            });
+
+            return <SortableListContainer
+                items={contentUI.actions}
+                // onSortStart={(args) => this._onSortStart(args)}
+                onSortEnd={(args: any) => onSortChanged(args)}
+                lockToContainerEdges={true}
+                useDragHandle={false}
+            />;
+        } else {
+            return <div>{contentUI.actions.map(renderScriptAction)}</div>;
+        }
+    };
+
     return <div className={styles.SiteScriptDesigner}>
-        {contentUI.actions && <SortableListContainer
-            items={contentUI.actions}
-            // onSortStart={(args) => this._onSortStart(args)}
-            onSortEnd={(args: any) => onSortChanged(args)}
-            lockToContainerEdges={true}
-            useDragHandle={true}
-        />}
-        <Adder items={getAddableActions()}
+        {contentUI.actions && contentUI.actions.length > 1 && <IconButton iconProps={{ iconName: "Sort" }}
+            styles={{ root: { position: "absolute", top: -32, right: 9 } }}
+            checked={isSorting}
+            onClick={toggleSorting} />}
+        {renderScriptActionsList()}
+        {!isSorting && <Adder items={getAddableActions()}
             searchBoxPlaceholderText="Search an action..."
-            onSelectedItem={(item) => onActionAdded(item.key)} />
+            onSelectedItem={(item) => onActionAdded(item.key)} />}
     </div>;
 };

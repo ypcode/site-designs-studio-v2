@@ -68,6 +68,7 @@
 
   .siteScriptAction {
     position: relative;
+    background-color: $ms-white;
 
     h4 {
       margin-top: 5px;
@@ -135,5 +136,18 @@
     padding-bottom: 5px;
     margin-bottom: 3px;
     min-height: 85px;
+  }
+  .isSorting {
+    .actionLabelText {
+      border-bottom: 1px dotted darkgray;
+    }
+  }
+
+  .sortIndex {
+    border: 2px dotted darkgray;
+    border-radius: 10px;
+    padding: 1px 4px 2px;
+    display: inline-block;
+    margin-right: 8px;
   }
 }
