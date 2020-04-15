@@ -168,7 +168,7 @@ export const SiteScriptDesigner = (props: ISiteScriptDesignerProps) => {
     const siteScriptSchemaService = appContext.serviceScope.consume(SiteScriptSchemaServiceKey);
     const [contentUI, setContentUI] = useState<ISiteScriptContentUIWrapper>(new SiteScriptContentUIWrapper(props.siteScriptContent));
     const previousContentUI = usePrevious<ISiteScriptContentUIWrapper>(contentUI);
-    const updateUITimeoutRef = React.useRef<number>(null);
+    const updateUITimeoutRef = React.useRef<any>(null);
     useEffect(() => {
         console.log("Site script content changed");
         const newContentUI = new SiteScriptContentUIWrapper(props.siteScriptContent);

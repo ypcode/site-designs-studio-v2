@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useState, useEffect, useRef } from "react";
 import styles from "./SiteScriptEditor.module.scss";
-import { TextField, PrimaryButton, Label, Stack, DefaultButton, ProgressIndicator, MessageBarType } from "office-ui-fabric-react";
+import { TextField, PrimaryButton, Label, Stack, DefaultButton, ProgressIndicator, MessageBarType, CommandButton, IContextualMenuProps } from "office-ui-fabric-react";
 import { useAppContext } from "../../app/App";
 import { IApplicationState } from "../../app/ApplicationState";
 import { ActionType, ISetAllAvailableSiteScripts, IGoToActionArgs, ISetUserMessageArgs } from "../../app/IApplicationAction";
@@ -13,6 +13,7 @@ import { SiteScriptSchemaServiceKey } from "../../services/siteScriptSchema/Site
 import { useConstCallback } from "@uifabric/react-hooks";
 import { Confirm } from "../common/Confirm/Confirm";
 import { toJSON } from "../../utils/jsonUtils";
+import { ExportServiceKey } from "../../services/export/ExportService";
 
 export interface ISiteScriptEditorProps {
     siteScript: ISiteScript;
@@ -25,12 +26,13 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
     // Get service references
     const siteDesignsService = appContext.serviceScope.consume(SiteDesignsServiceKey);
     const siteScriptSchemaService = appContext.serviceScope.consume(SiteScriptSchemaServiceKey);
+    const exportService = appContext.serviceScope.consume(ExportServiceKey);
 
     console.debug("############ Render SiteScriptEdito");
 
     // Use state values
     const [editingSiteScript, setEditingSiteScript] = useState<ISiteScript>({ ...(props.siteScript || {} as ISiteScript) });
-    const [updatedContentFrom, setUpdatedContentFrom] = useState<"UI"|"CODE"|null>(null);
+    const [updatedContentFrom, setUpdatedContentFrom] = useState<"UI" | "CODE" | null>(null);
     const [isSaving, setIsSaving] = useState<boolean>(false);
 
     // Use refs
@@ -103,7 +105,7 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
             execute("SET_ALL_AVAILABLE_SITE_SCRIPTS", { siteScripts: refreshedSiteScripts } as ISetAllAvailableSiteScripts);
             // If it is a brand new script, force redirect to the script list
             if (!editingSiteScript.Id) {
-                execute("GO_TO", {page:"SiteScriptsList"} as IGoToActionArgs);
+                execute("GO_TO", { page: "SiteScriptsList" } as IGoToActionArgs);
             }
         } catch (error) {
             execute("SET_USER_MESSAGE", {
@@ -150,7 +152,27 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
         setIsSaving(false);
     };
 
-    let codeUpdateTimeoutHandle: number = null;
+    const onExportAsJSON = () => {
+        exportService.exportSiteScriptAsJSON(editingSiteScript);
+    };
+
+    const onExportAsPnPPowershellScript = () => {
+        exportService.exportSiteScriptAsPnPPowershellScript(editingSiteScript);
+    };
+
+    const onExportAsPnPTemplate = () => {
+        exportService.exportSiteScriptAsPnPTemplate(editingSiteScript);
+    };
+
+    const onExportAsO365PowershellScript = () => {
+        exportService.exportSiteScriptAsO365CLIScript(editingSiteScript, "Powershell");
+    };
+
+    const onExportAsO365PBashScript = () => {
+        exportService.exportSiteScriptAsO365CLIScript(editingSiteScript, "Bash");
+    };
+
+    let codeUpdateTimeoutHandle: any = null;
     const onCodeChanged = (updatedCode: string) => {
         console.log("Code changed");
         if (!updatedCode) {
@@ -247,7 +269,53 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
                     </div>
                     {!isLoading && <div className={`${styles.column1} ${styles.righted}`}>
                         <Stack horizontal horizontalAlign="end" tokens={{ childrenGap: 15 }}>
-                            <DefaultButton disabled={isSaving} text="Delete" iconProps={{ iconName: "Delete" }} onClick={() => onDelete()} />
+                            <CommandButton disabled={isSaving} iconProps={{ iconName: "More" }} menuProps={{
+                                items: [
+                                    (editingSiteScript.Id && {
+                                        key: 'deleteScript',
+                                        text: 'Delete',
+                                        iconProps: { iconName: 'Delete' },
+                                        onClick: onDelete
+                                    }),
+                                    {
+                                        key: 'exportJson',
+                                        text: 'Export as JSON',
+                                        iconProps: { iconName: 'Download' },
+                                        onClick: onExportAsJSON,
+                                        disabled: !isValidForSave
+                                    },
+                                    {
+                                        key: 'exportPnPPosh',
+                                        text: 'Export as PnP Powershell script',
+                                        iconProps: { iconName: 'Download' },
+                                        onClick: onExportAsPnPPowershellScript,
+                                        disabled: !isValidForSave
+                                    },
+                                    {
+                                        key: 'exportPnPTemplate',
+                                        text: 'Export as PnP template',
+                                        iconProps: { iconName: 'Download' },
+                                        onClick: onExportAsPnPTemplate,
+                                        // disabled: !isValidForSave
+                                        disabled: true
+                                    },
+                                    {
+                                        key: 'exportO365PS',
+                                        text: 'Export as O365 CLI script (Powershell)',
+                                        iconProps: { iconName: 'Download' },
+                                        onClick: onExportAsO365PowershellScript,
+                                        disabled: !isValidForSave
+                                    },
+                                    {
+                                        key: 'exporto365Bash',
+                                        text: 'Export as O365 CLI script (Bash)',
+                                        disabled: true,
+                                        iconProps: { iconName: 'Download' },
+                                        onClick: onExportAsO365PBashScript,
+                                        // disabled: !isValidForSave
+                                    },
+                                ].filter(i => !!i),
+                            } as IContextualMenuProps} />
                             <PrimaryButton disabled={isSaving || !isValidForSave} text="Save" iconProps={{ iconName: "Save" }} onClick={() => onSave()} />
                         </Stack>
                     </div>}

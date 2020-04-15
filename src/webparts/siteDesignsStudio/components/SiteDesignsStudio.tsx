@@ -164,7 +164,7 @@ const AppPage = (props: any) => {
   const [appContext, action] = useAppContext<IApplicationState, ActionType>();
 
   const siteDesignsService = appContext.serviceScope.consume(SiteDesignsServiceKey);
-  const userMessageTimeoutHandleRef = useRef(0);
+  const userMessageTimeoutHandleRef = useRef(null);
 
   useEffect(() => {
     if (!appContext.allAvailableSiteDesigns || appContext.allAvailableSiteDesigns.length == 0) {
