@@ -92,7 +92,7 @@ class ExportService implements IExportService {
                 .replace(/\{\{title\}\}/g, siteScript.Title || "SiteScript - No title")
                 .replace(/\{\{jsonFileName\}\}/g, jsonFileName)
                 .replace(/\{\{description\}\}/g, siteScript.Description || "");
-            pkg.addOrUpdateFile("AddSiteScript.ps1", processedTemplate);
+            pkg.addOrUpdateFile("AddSiteScript.sh", processedTemplate);
         }
         return pkg;
     }
