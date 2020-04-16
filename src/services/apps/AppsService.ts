@@ -56,4 +56,4 @@ class AppsService implements IAppsService {
     }
 }
 
-export const AppsServiceKey = ServiceKey.create<IAppsService>('YPCODE:AppsService', AppsService);
+export const AppsServiceKey = ServiceKey.create<IAppsService>('YPCODE:SDSv2:AppsService', AppsService);

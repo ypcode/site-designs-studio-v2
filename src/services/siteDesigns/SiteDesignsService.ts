@@ -254,6 +254,6 @@ export class SiteDesignsService implements ISiteDesignsService {
 }
 
 export const SiteDesignsServiceKey = ServiceKey.create<ISiteDesignsService>(
-	'YPCODE:SiteDesignsService',
+	'YPCODE:SDSv2:SiteDesignsService',
 	SiteDesignsService
 );

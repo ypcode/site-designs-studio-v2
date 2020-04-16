@@ -5,7 +5,7 @@ import { SiteScriptSchemaServiceKey } from "../../services/siteScriptSchema/Site
 import { RenderingServiceKey } from "../../services/rendering/RenderingService";
 import { ActionType } from "../../app/IApplicationAction";
 import styles from "./SiteScriptDesigner.module.scss";
-import { Adder, IAddableItem } from "../common/Adder/Adder";
+import { Adder, IAddableItem } from "../common/adder/Adder";
 import { IconButton, Link, Label, Icon, Stack } from "office-ui-fabric-react";
 import { useState, useEffect } from "react";
 import { getTrimmedText } from "../../utils/textUtils";

@@ -232,4 +232,4 @@ class RenderingService implements IRenderingService {
     }
 }
 
-export const RenderingServiceKey = ServiceKey.create<IRenderingService>('YPCODE:RenderingService', RenderingService);
+export const RenderingServiceKey = ServiceKey.create<IRenderingService>('YPCODE:SDSv2:RenderingService', RenderingService);

@@ -9,11 +9,11 @@ import { Placeholder } from "@pnp/spfx-controls-react/lib/Placeholder";
 import { useAppContext } from "../../app/App";
 import { IApplicationState } from "../../app/ApplicationState";
 import { ActionType, ISetAllAvailableSiteDesigns, IGoToActionArgs, ISetUserMessageArgs } from "../../app/IApplicationAction";
-import { Adder, IAddableItem } from "../common/Adder/Adder";
+import { Adder, IAddableItem } from "../common/adder/Adder";
 import { SiteDesignsServiceKey } from "../../services/siteDesigns/SiteDesignsService";
 import { ISiteScript } from "../../models/ISiteScript";
 import { find } from "@microsoft/sp-lodash-subset";
-import { Confirm } from "../common/Confirm/Confirm";
+import { Confirm } from "../common/confirm/Confirm";
 import { SiteDesignPreviewImageServiceKey } from "../../services/siteDesignPreviewImage/SiteDesignPreviewImageService";
 
 export interface ISiteDesignEditorProps {

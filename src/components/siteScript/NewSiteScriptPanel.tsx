@@ -5,10 +5,12 @@ import { useAppContext } from "../../app/App";
 import { IApplicationState } from "../../app/ApplicationState";
 import { ISiteScript, ISiteScriptContent } from "../../models/ISiteScript";
 import { SiteScriptSchemaServiceKey } from "../../services/siteScriptSchema/SiteScriptSchemaService";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Panel, PanelType } from "office-ui-fabric-react/lib/Panel";
 import { SiteDesignsServiceKey, IGetSiteScriptFromWebOptions, IGetSiteScriptFromExistingResourceResult } from "../../services/siteDesigns/SiteDesignsService";
 import { TextField, PrimaryButton, Stack, Toggle, CompoundButton, DefaultButton } from "office-ui-fabric-react";
+import { SitePicker } from "../common/sitePicker/SitePicker";
+import { ListPicker } from "../common/listPicker/ListPicker";
 
 export interface INewSiteScriptPanelProps {
     isOpen: boolean;
@@ -40,7 +42,7 @@ export const NewSiteScriptPanel = (props: INewSiteScriptPanelProps) => {
     const [creationArgs, setCreationArgs] = useState<ICreateArgs>({ from: "BLANK" });
     const [fromWebArgs, setFromWebArgs] = useState<IGetSiteScriptFromWebOptions>(getDefaultFromWebArgs());
 
-    React.useEffect(() => {
+    useEffect(() => {
         setCreationArgs({ from: "BLANK" });
         setNeedsArguments(false);
         setFromWebArgs(getDefaultFromWebArgs());
@@ -100,43 +102,57 @@ export const NewSiteScriptPanel = (props: INewSiteScriptPanelProps) => {
 
     const renderFromWebArgumentsForm = () => {
         return <Stack tokens={{ childrenGap: 8 }}>
-            <TextField label="Site URL" onChange={(_, webUrl) => setCreationArgs({ ...creationArgs, webUrl })} />
+            <SitePicker label="Site" onSiteSelected={webUrl => {
+                setCreationArgs({ ...creationArgs, webUrl });
+            }} serviceScope={appContext.serviceScope} />
             <TextField label="Include lists"
                 multiline
                 rows={6}
                 placeholder="1 list relative URL per row"
                 onChange={(_, listUrlsStr) => setFromWebArgs({ ...fromWebArgs, includeLists: listUrlsStr.split('\n') })} />
-            {/* TODO Add includeLists arg */}
-            <div className={styles.row}>
+            <div className={styles.toggleRow}>
                 <div className={styles.column8}>Include Branding</div>
                 <div className={styles.column4}>
-                    <Toggle onChange={(_, includeBranding) => setFromWebArgs({ ...fromWebArgs, includeBranding })} />
+                    <Toggle checked={true} onChange={(_, includeBranding) => setFromWebArgs({ ...fromWebArgs, includeBranding })} />
                 </div>
             </div>
-            <div className={styles.row}>
+            <div className={styles.toggleRow}>
                 <div className={styles.column8}>Include Regional settings</div>
                 <div className={styles.column4}>
-                    <Toggle onChange={(_, includeRegionalSettings) => setFromWebArgs({ ...fromWebArgs, includeRegionalSettings })} />
+                    <Toggle checked={true} onChange={(_, includeRegionalSettings) => setFromWebArgs({ ...fromWebArgs, includeRegionalSettings })} />
                 </div>
             </div>
-            <div className={styles.row}>
+            <div className={styles.toggleRow}>
                 <div className={styles.column8}>Include Site external sharing capability</div>
                 <div className={styles.column4}>
-                    <Toggle onChange={(_, includeSiteExternalSharingCapability) => setFromWebArgs({ ...fromWebArgs, includeSiteExternalSharingCapability })} />
+                    <Toggle checked={true} onChange={(_, includeSiteExternalSharingCapability) => setFromWebArgs({ ...fromWebArgs, includeSiteExternalSharingCapability })} />
                 </div>
             </div>
-            <div className={styles.row}>
+            <div className={styles.toggleRow}>
                 <div className={styles.column8}>Include theme</div>
                 <div className={styles.column4}>
-                    <Toggle onChange={(_, includeTheme) => setFromWebArgs({ ...fromWebArgs, includeTheme })} />
+                    <Toggle checked={true} onChange={(_, includeTheme) => setFromWebArgs({ ...fromWebArgs, includeTheme })} />
                 </div>
             </div>
-            <div className={styles.row}>
+            <div className={styles.toggleRow}>
                 <div className={styles.column8}>Include links to exported items</div>
                 <div className={styles.column4}>
-                    <Toggle onChange={(_, includeLinksToExportedItems) => setFromWebArgs({ ...fromWebArgs, includeLinksToExportedItems })} />
+                    <Toggle checked={true} onChange={(_, includeLinksToExportedItems) => setFromWebArgs({ ...fromWebArgs, includeLinksToExportedItems })} />
                 </div>
             </div>
+        </Stack>;
+    };
+
+    const renderFromListArgumentsForm = () => {
+        return <Stack tokens={{ childrenGap: 8 }}>
+            <SitePicker label="Site" onSiteSelected={webUrl => {
+                setCreationArgs({ ...creationArgs, webUrl });
+            }} serviceScope={appContext.serviceScope} />
+            <ListPicker serviceScope={appContext.serviceScope}
+                webUrl={creationArgs.webUrl}
+                label="List"
+                onListSelected={(listUrl) => setCreationArgs({ ...creationArgs, listUrl })}
+            />
         </Stack>;
     };
 
@@ -146,9 +162,7 @@ export const NewSiteScriptPanel = (props: INewSiteScriptPanelProps) => {
         }
 
         if (creationArgs.from == "LIST") {
-            return <TextField label="List URL"
-                placeholder="Enter the URL of the list to use"
-                onChange={(_, listUrl) => setCreationArgs({ ...creationArgs, listUrl })} />;
+            return renderFromListArgumentsForm();
         } else if (creationArgs.from == "WEB") {
             return renderFromWebArgumentsForm();
         }
@@ -177,8 +191,7 @@ export const NewSiteScriptPanel = (props: INewSiteScriptPanelProps) => {
         headerText={getPanelHeaderText()}
         isOpen={props.isOpen}
         onDismiss={onCancel}
-        isFooterAtBottom={true}
-        onRenderFooter={() => needsArguments && <div className={styles.panelFooter}>
+        onRenderFooterContent={() => needsArguments && <div className={styles.panelFooter}>
             <Stack horizontalAlign="end" horizontal tokens={{ childrenGap: 25 }}>
                 <PrimaryButton text="Add Site Script" onClick={onScriptAdded} disabled={!validateArguments()} />
                 <DefaultButton text="Cancel" onClick={onCancel} />

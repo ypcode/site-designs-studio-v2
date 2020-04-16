@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useState, useEffect, useRef } from "react";
 import styles from "./SiteScriptEditor.module.scss";
-import { TextField, PrimaryButton, Label, Stack, DefaultButton, ProgressIndicator, MessageBarType, CommandButton, IContextualMenuProps } from "office-ui-fabric-react";
+import { TextField, PrimaryButton, Label, Stack, DefaultButton, ProgressIndicator, MessageBarType, CommandButton, IContextualMenuProps, Panel, PanelType, Pivot, PivotItem, Icon } from "office-ui-fabric-react";
 import { useAppContext } from "../../app/App";
 import { IApplicationState } from "../../app/ApplicationState";
 import { ActionType, ISetAllAvailableSiteScripts, IGoToActionArgs, ISetUserMessageArgs } from "../../app/IApplicationAction";
@@ -11,13 +11,17 @@ import { ISiteScript, ISiteScriptContent } from "../../models/ISiteScript";
 import CodeEditor, { monaco } from "@monaco-editor/react";
 import { SiteScriptSchemaServiceKey } from "../../services/siteScriptSchema/SiteScriptSchemaService";
 import { useConstCallback } from "@uifabric/react-hooks";
-import { Confirm } from "../common/Confirm/Confirm";
+import { Confirm } from "../common/confirm/Confirm";
 import { toJSON } from "../../utils/jsonUtils";
 import { ExportServiceKey } from "../../services/export/ExportService";
+import { ExportPackage } from "../../helpers/ExportPackage";
+import { ExportPackageViewer } from "../exportPackageViewer/ExportPackageViewer";
 
 export interface ISiteScriptEditorProps {
     siteScript: ISiteScript;
 }
+
+type ExportType = "json" | "PnPPowershell" | "PnPTemplate" | "o365_PS" | "o365_Bash";
 
 export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
 
@@ -28,12 +32,14 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
     const siteScriptSchemaService = appContext.serviceScope.consume(SiteScriptSchemaServiceKey);
     const exportService = appContext.serviceScope.consume(ExportServiceKey);
 
-    console.debug("############ Render SiteScriptEdito");
-
     // Use state values
     const [editingSiteScript, setEditingSiteScript] = useState<ISiteScript>({ ...(props.siteScript || {} as ISiteScript) });
     const [updatedContentFrom, setUpdatedContentFrom] = useState<"UI" | "CODE" | null>(null);
+    const [isValidCode, setIsValidCode] = useState<boolean>(true);
     const [isSaving, setIsSaving] = useState<boolean>(false);
+    const [isExportUIOpen, setIsExportUIOpen] = useState<boolean>(false);
+    const [currentExportPackage, setCurrentExportPackage] = useState<ExportPackage>(null);
+    const [currentExportType, setCurrentExportType] = useState<ExportType>("json");
 
     // Use refs
     const codeEditorRef = useRef<any>();
@@ -55,10 +61,10 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
         }
 
         setLoading(true);
-        console.log("Loading site script...", props.siteScript.Id);
+        console.debug("Loading site script...", props.siteScript.Id);
         siteDesignsService.getSiteScript(props.siteScript.Id).then(loadedSiteScript => {
             setEditingSiteScript(loadedSiteScript);
-            console.log("Loaded: ", loadedSiteScript);
+            console.debug("Loaded: ", loadedSiteScript);
         }).catch(error => {
             console.error(`The Site Script ${props.siteScript.Id} could not be loaded`, error);
         }).then(() => {
@@ -152,29 +158,37 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
         setIsSaving(false);
     };
 
-    const onExportAsJSON = () => {
-        exportService.exportSiteScriptAsJSON(editingSiteScript);
-    };
+    const onExportRequested = (exportType?: ExportType) => {
+        let exportPromise: Promise<ExportPackage> = null;
+        switch (exportType) {
+            case "PnPPowershell":
+                exportPromise = exportService.generateSiteScriptPnPPowershellExportPackage(editingSiteScript);
+                break;
+            case "PnPTemplate":
+                break; // Not yet supported
+            case "o365_PS":
+                exportPromise = exportService.generateSiteScriptO365CLIExportPackage(editingSiteScript, "Powershell");
+                break;
+            case "o365_Bash":
+                exportPromise = exportService.generateSiteScriptO365CLIExportPackage(editingSiteScript, "Bash");
+                break;
+            case "json":
+            default:
+                exportPromise = exportService.generateSiteScriptJSONExportPackage(editingSiteScript);
+                break;
+        }
 
-    const onExportAsPnPPowershellScript = () => {
-        exportService.exportSiteScriptAsPnPPowershellScript(editingSiteScript);
-    };
-
-    const onExportAsPnPTemplate = () => {
-        exportService.exportSiteScriptAsPnPTemplate(editingSiteScript);
-    };
-
-    const onExportAsO365PowershellScript = () => {
-        exportService.exportSiteScriptAsO365CLIScript(editingSiteScript, "Powershell");
-    };
-
-    const onExportAsO365PBashScript = () => {
-        exportService.exportSiteScriptAsO365CLIScript(editingSiteScript, "Bash");
+        if (exportPromise) {
+            exportPromise.then(exportPackage => {
+                setCurrentExportPackage(exportPackage);
+                setCurrentExportType(exportType);
+                setIsExportUIOpen(true);
+            });
+        }
     };
 
     let codeUpdateTimeoutHandle: any = null;
     const onCodeChanged = (updatedCode: string) => {
-        console.log("Code changed");
         if (!updatedCode) {
             return;
         }
@@ -196,6 +210,9 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
                     const updatedScriptContent = JSON.parse(updatedCode) as ISiteScriptContent;
                     setEditingSiteScript({ ...editingSiteScript, Content: updatedScriptContent });
                     setUpdatedContentFrom("CODE");
+                    setIsValidCode(true);
+                } else {
+                    setIsValidCode(false);
                 }
             } catch (error) {
                 console.warn("Code is not valid site script JSON");
@@ -229,7 +246,7 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
         });
     };
 
-    const isValidForSave: () => [boolean, string?] = () => {
+    const checkIsValidForSave: () => [boolean, string?] = () => {
         if (!editingSiteScript) {
             return [false, "Current Site Script not defined"];
         }
@@ -238,10 +255,15 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
             return [false, "Please set the title of the Site Script..."];
         }
 
+        if (!isValidCode) {
+            return [false, "Please check the validity of the code..."];
+        }
+
         return [true];
     };
 
     const isLoading = appContext.isLoading;
+    const [isValidForSave, validationMessage] = checkIsValidForSave();
     return <div className={styles.SiteScriptEditor}>
         <div className={styles.row}>
             <div className={styles.columnLayout}>
@@ -278,42 +300,12 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
                                         onClick: onDelete
                                     }),
                                     {
-                                        key: 'exportJson',
-                                        text: 'Export as JSON',
+                                        key: 'export',
+                                        text: 'Export',
                                         iconProps: { iconName: 'Download' },
-                                        onClick: onExportAsJSON,
+                                        onClick: () => onExportRequested(),
                                         disabled: !isValidForSave
-                                    },
-                                    {
-                                        key: 'exportPnPPosh',
-                                        text: 'Export as PnP Powershell script',
-                                        iconProps: { iconName: 'Download' },
-                                        onClick: onExportAsPnPPowershellScript,
-                                        disabled: !isValidForSave
-                                    },
-                                    {
-                                        key: 'exportPnPTemplate',
-                                        text: 'Export as PnP template',
-                                        iconProps: { iconName: 'Download' },
-                                        onClick: onExportAsPnPTemplate,
-                                        // disabled: !isValidForSave
-                                        disabled: true
-                                    },
-                                    {
-                                        key: 'exportO365PS',
-                                        text: 'Export as O365 CLI script (Powershell)',
-                                        iconProps: { iconName: 'Download' },
-                                        onClick: onExportAsO365PowershellScript,
-                                        disabled: !isValidForSave
-                                    },
-                                    {
-                                        key: 'exporto365Bash',
-                                        text: 'Export as O365 CLI script (Bash)',
-                                        disabled: true,
-                                        iconProps: { iconName: 'Download' },
-                                        onClick: onExportAsO365PBashScript,
-                                        // disabled: !isValidForSave
-                                    },
+                                    }
                                 ].filter(i => !!i),
                             } as IContextualMenuProps} />
                             <PrimaryButton disabled={isSaving || !isValidForSave} text="Save" iconProps={{ iconName: "Save" }} onClick={() => onSave()} />
@@ -379,5 +371,24 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
                 </div>
             </div>
         </div>
+        <Panel isOpen={isExportUIOpen}
+            type={PanelType.large}
+            headerText="Export Site Script"
+            onRenderFooterContent={(p) => <Stack horizontalAlign="end" horizontal tokens={{ childrenGap: 10 }}>
+                <PrimaryButton iconProps={{ iconName: "Download" }} text="Download" onClick={() => currentExportPackage && currentExportPackage.download()} />
+                <DefaultButton text="Cancel" onClick={() => setIsExportUIOpen(false)} /></Stack>}>
+            <Pivot
+                selectedKey={currentExportType}
+                onLinkClick={(item) => onExportRequested(item.props.itemKey as ExportType)}
+                headersOnly={true}
+            >
+                <PivotItem headerText="JSON" itemKey="json" />
+                <PivotItem headerText="PnP Powershell" itemKey="PnPPowershell" />
+                {/* <PivotItem headerText="PnP Template" itemKey="PnPTemplate" /> */}
+                <PivotItem headerText="O365 CLI (Powershell)" itemKey="o365_PS" />
+                <PivotItem headerText="O365 CLI (Bash)" itemKey="o365_Bash" />
+            </Pivot>
+            {currentExportPackage && <ExportPackageViewer exportPackage={currentExportPackage} />}
+        </Panel>
     </div>;
 };

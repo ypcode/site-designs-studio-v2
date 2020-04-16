@@ -451,6 +451,6 @@ export class SiteScriptSchemaService implements ISiteScriptSchemaService {
 }
 
 export const SiteScriptSchemaServiceKey = ServiceKey.create<ISiteScriptSchemaService>(
-    'YPCODE:SiteScriptSchemaService',
+    'YPCODE:SDSv2:SiteScriptSchemaService',
     SiteScriptSchemaService
 );

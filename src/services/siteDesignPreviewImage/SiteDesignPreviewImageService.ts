@@ -49,6 +49,6 @@ class SiteDesignPreviewImageService implements ISiteDesignPreviewImageService {
 }
 
 export const SiteDesignPreviewImageServiceKey = ServiceKey.create<ISiteDesignPreviewImageService>(
-    'YPCODE:SiteDesignPreviewImageService',
+    'YPCODE:SDSv2:SiteDesignPreviewImageService',
     SiteDesignPreviewImageService
 );

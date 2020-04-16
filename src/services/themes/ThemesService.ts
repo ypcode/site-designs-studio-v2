@@ -54,4 +54,4 @@ class ThemeService implements IThemeService {
     }
 }
 
-export const ThemeServiceKey = ServiceKey.create<IThemeService>('YPCODE:ThemeService', ThemeService);
+export const ThemeServiceKey = ServiceKey.create<IThemeService>('YPCODE:SDSv2:ThemeService', ThemeService);

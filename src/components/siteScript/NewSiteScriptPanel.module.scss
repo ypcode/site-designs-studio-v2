@@ -6,6 +6,11 @@
     @include ms-Grid-row;
   }
 
+  .toggleRow {
+    @include ms-Grid-row;
+    margin-top: 10px;
+  }
+
   .column {
     @include ms-Grid-col;
     @include ms-sm12;

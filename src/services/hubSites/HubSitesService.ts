@@ -66,4 +66,4 @@ class HubSitesService implements IHubSitesService {
     }
 }
 
-export const HubSitesServiceKey = ServiceKey.create<IHubSitesService>('YPCODE:HubSitesService', HubSitesService);
+export const HubSitesServiceKey = ServiceKey.create<IHubSitesService>('YPCODE:SDSv2:HubSitesService', HubSitesService);

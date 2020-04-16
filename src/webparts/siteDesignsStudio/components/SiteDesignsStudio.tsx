@@ -9,7 +9,7 @@ import { IApplicationState } from '../../../app/ApplicationState';
 import { App, useAppContext } from '../../../app/App';
 import { Reducers } from '../../../app/ApplicationReducers';
 import { ActionType, IGoToActionArgs, ISetAllAvailableSiteDesigns, ISetAllAvailableSiteScripts, IEditSiteDesignActionArgs, IEditSiteScriptActionArgs } from '../../../app/IApplicationAction';
-import { Debugger } from "../../../components/common/Debugger/Debugger";
+import { Debugger } from "../../../components/common/debugger/Debugger";
 
 import { Nav, INavLink, INav } from 'office-ui-fabric-react/lib/Nav';
 
