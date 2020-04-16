@@ -113,31 +113,31 @@ export const NewSiteScriptPanel = (props: INewSiteScriptPanelProps) => {
             <div className={styles.toggleRow}>
                 <div className={styles.column8}>Include Branding</div>
                 <div className={styles.column4}>
-                    <Toggle checked={true} onChange={(_, includeBranding) => setFromWebArgs({ ...fromWebArgs, includeBranding })} />
+                    <Toggle checked={fromWebArgs && fromWebArgs.includeBranding} onChange={(_, includeBranding) => setFromWebArgs({ ...fromWebArgs, includeBranding })} />
                 </div>
             </div>
             <div className={styles.toggleRow}>
                 <div className={styles.column8}>Include Regional settings</div>
                 <div className={styles.column4}>
-                    <Toggle checked={true} onChange={(_, includeRegionalSettings) => setFromWebArgs({ ...fromWebArgs, includeRegionalSettings })} />
+                    <Toggle checked={fromWebArgs && fromWebArgs.includeRegionalSettings} onChange={(_, includeRegionalSettings) => setFromWebArgs({ ...fromWebArgs, includeRegionalSettings })} />
                 </div>
             </div>
             <div className={styles.toggleRow}>
                 <div className={styles.column8}>Include Site external sharing capability</div>
                 <div className={styles.column4}>
-                    <Toggle checked={true} onChange={(_, includeSiteExternalSharingCapability) => setFromWebArgs({ ...fromWebArgs, includeSiteExternalSharingCapability })} />
+                    <Toggle checked={fromWebArgs && fromWebArgs.includeSiteExternalSharingCapability} onChange={(_, includeSiteExternalSharingCapability) => setFromWebArgs({ ...fromWebArgs, includeSiteExternalSharingCapability })} />
                 </div>
             </div>
             <div className={styles.toggleRow}>
                 <div className={styles.column8}>Include theme</div>
                 <div className={styles.column4}>
-                    <Toggle checked={true} onChange={(_, includeTheme) => setFromWebArgs({ ...fromWebArgs, includeTheme })} />
+                    <Toggle checked={fromWebArgs && fromWebArgs.includeTheme} onChange={(_, includeTheme) => setFromWebArgs({ ...fromWebArgs, includeTheme })} />
                 </div>
             </div>
             <div className={styles.toggleRow}>
                 <div className={styles.column8}>Include links to exported items</div>
                 <div className={styles.column4}>
-                    <Toggle checked={true} onChange={(_, includeLinksToExportedItems) => setFromWebArgs({ ...fromWebArgs, includeLinksToExportedItems })} />
+                    <Toggle checked={fromWebArgs && fromWebArgs.includeLinksToExportedItems} onChange={(_, includeLinksToExportedItems) => setFromWebArgs({ ...fromWebArgs, includeLinksToExportedItems })} />
                 </div>
             </div>
         </Stack>;
