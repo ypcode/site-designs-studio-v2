@@ -16,6 +16,7 @@ export interface ISiteScriptAction {
     Description: string;
     Content: ISiteScriptContent;
     Version: number;
+    IsSiteScriptPackage?: boolean;
   }
   
   export const SiteScriptEntitySchema = {

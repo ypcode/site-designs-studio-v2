@@ -10,12 +10,12 @@ import { SiteDesignsServiceKey } from "../../services/siteDesigns/SiteDesignsSer
 import { ISiteScript, ISiteScriptContent } from "../../models/ISiteScript";
 import CodeEditor, { monaco } from "@monaco-editor/react";
 import { SiteScriptSchemaServiceKey } from "../../services/siteScriptSchema/SiteScriptSchemaService";
-import { useConstCallback } from "@uifabric/react-hooks";
 import { Confirm } from "../common/confirm/Confirm";
 import { toJSON } from "../../utils/jsonUtils";
 import { ExportServiceKey } from "../../services/export/ExportService";
 import { ExportPackage } from "../../helpers/ExportPackage";
 import { ExportPackageViewer } from "../exportPackageViewer/ExportPackageViewer";
+import { useTraceUpdate } from "../../helpers/hooks";
 
 export interface ISiteScriptEditorProps {
     siteScript: ISiteScript;
@@ -23,8 +23,18 @@ export interface ISiteScriptEditorProps {
 
 type ExportType = "json" | "PnPPowershell" | "PnPTemplate" | "o365_PS" | "o365_Bash";
 
-export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
+interface ISiteScriptEditorState {
+    editingSiteScript: ISiteScript;
+    updatedContentFrom: "UI" | "CODE" | null;
+    isValidCode: boolean;
+    isSaving: boolean;
+    isExportUIOpen: boolean;
+    currentExportPackage: ExportPackage;
+    currentExportType: ExportType;
+}
 
+export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
+    useTraceUpdate('SiteScriptEditor', props);
     const [appContext, execute] = useAppContext<IApplicationState, ActionType>();
 
     // Get service references
@@ -32,14 +42,22 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
     const siteScriptSchemaService = appContext.serviceScope.consume(SiteScriptSchemaServiceKey);
     const exportService = appContext.serviceScope.consume(ExportServiceKey);
 
-    // Use state values
-    const [editingSiteScript, setEditingSiteScript] = useState<ISiteScript>({ ...(props.siteScript || {} as ISiteScript) });
-    const [updatedContentFrom, setUpdatedContentFrom] = useState<"UI" | "CODE" | null>(null);
-    const [isValidCode, setIsValidCode] = useState<boolean>(true);
-    const [isSaving, setIsSaving] = useState<boolean>(false);
-    const [isExportUIOpen, setIsExportUIOpen] = useState<boolean>(false);
-    const [currentExportPackage, setCurrentExportPackage] = useState<ExportPackage>(null);
-    const [currentExportType, setCurrentExportType] = useState<ExportType>("json");
+    const [state, setState] = useState<ISiteScriptEditorState>({
+        editingSiteScript: null,
+        currentExportPackage: null,
+        currentExportType: "json",
+        isExportUIOpen: false,
+        isSaving: false,
+        isValidCode: true,
+        updatedContentFrom: null
+    });
+    const { editingSiteScript,
+        isValidCode,
+        updatedContentFrom,
+        isExportUIOpen,
+        currentExportType,
+        currentExportPackage,
+        isSaving } = state;
 
     // Use refs
     const codeEditorRef = useRef<any>();
@@ -49,11 +67,10 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
     const setLoading = (loading: boolean) => {
         execute("SET_LOADING", { loading });
     };
-
     // Use Effects
     useEffect(() => {
         if (!props.siteScript.Id) {
-            setEditingSiteScript(props.siteScript);
+            setState({ ...state, editingSiteScript: { ...props.siteScript } as ISiteScript });
             if (titleFieldRef.current) {
                 titleFieldRef.current.focus();
             }
@@ -63,7 +80,7 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
         setLoading(true);
         console.debug("Loading site script...", props.siteScript.Id);
         siteDesignsService.getSiteScript(props.siteScript.Id).then(loadedSiteScript => {
-            setEditingSiteScript(loadedSiteScript);
+            setState({ ...state, editingSiteScript: loadedSiteScript });
             console.debug("Loaded: ", loadedSiteScript);
         }).catch(error => {
             console.error(`The Site Script ${props.siteScript.Id} could not be loaded`, error);
@@ -73,32 +90,46 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
     }, [props.siteScript]);
 
     const onTitleChanged = (ev: any, title: string) => {
-        setEditingSiteScript({ ...editingSiteScript, Title: title });
+        const newSiteScript = { ...editingSiteScript, Title: title };
+        setState({
+            ...state,
+            editingSiteScript: newSiteScript
+        });
     };
 
-    let currentDescription = useRef<string>(editingSiteScript.Description);
+    let currentDescription = useRef<string>(editingSiteScript && editingSiteScript.Description);
     const onDescriptionChanging = (ev: any, description: string) => {
         currentDescription.current = description;
     };
 
-    const onDescriptionInputBlur = useConstCallback((ev: any) => {
-        setEditingSiteScript({ ...editingSiteScript, Description: currentDescription.current });
-    });
+    const onDescriptionInputBlur = (ev: any) => {
+        setState({
+            ...state,
+            editingSiteScript: { ...editingSiteScript, Description: currentDescription.current }
+        });
+    };
 
     const onVersionChanged = (ev: any, version: string) => {
         const versionInt = parseInt(version);
         if (!isNaN(versionInt)) {
-            setEditingSiteScript({ ...editingSiteScript, Version: versionInt });
+            setState({
+                ...state,
+                editingSiteScript: { ...editingSiteScript, Version: versionInt }
+            });
         }
     };
 
     const onSiteScriptContentUpdatedFromUI = (updatedContent: ISiteScriptContent) => {
-        setUpdatedContentFrom("UI");
-        setEditingSiteScript({ ...editingSiteScript, Content: updatedContent });
+        const newState = {
+            ...state,
+            updatedContentFrom: 'UI',
+            editingSiteScript: { ...editingSiteScript, Content: updatedContent }
+        } as ISiteScriptEditorState;
+       setState(newState);
     };
 
     const onSave = async () => {
-        setIsSaving(true);
+        setState({ ...state, isSaving: true });
         try {
             await siteDesignsService.saveSiteScript(editingSiteScript);
             const refreshedSiteScripts = await siteDesignsService.getSiteScripts();
@@ -123,7 +154,7 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
             console.error(error);
         }
 
-        setIsSaving(false);
+        setState({ ...state, isSaving: false });
     };
 
     const onDelete = async () => {
@@ -134,7 +165,7 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
             return;
         }
 
-        setIsSaving(true);
+        setState({ ...state, isSaving: true });
         try {
             await siteDesignsService.deleteSiteScript(editingSiteScript);
             const refreshedSiteScripts = await siteDesignsService.getSiteScripts();
@@ -155,7 +186,7 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
             } as ISetUserMessageArgs);
             console.error(error);
         }
-        setIsSaving(false);
+        setState({ ...state, isSaving: false });
     };
 
     const onExportRequested = (exportType?: ExportType) => {
@@ -180,9 +211,12 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
 
         if (exportPromise) {
             exportPromise.then(exportPackage => {
-                setCurrentExportPackage(exportPackage);
-                setCurrentExportType(exportType);
-                setIsExportUIOpen(true);
+                setState({
+                    ...state,
+                    currentExportPackage: exportPackage,
+                    currentExportType: exportType,
+                    isExportUIOpen: true
+                });
             });
         }
     };
@@ -200,7 +234,10 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
         if (updatedContentFrom == "UI") {
             // Not trigger the change of state if the script content was updated from UI
             console.debug("The code has been modified after a change in designer. The event will not be propagated");
-            setUpdatedContentFrom(null);
+            setState({
+                ...state,
+                updatedContentFrom: null
+            });
             return;
         }
 
@@ -208,11 +245,17 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
             try {
                 if (siteScriptSchemaService.validateSiteScriptJson(updatedCode)) {
                     const updatedScriptContent = JSON.parse(updatedCode) as ISiteScriptContent;
-                    setEditingSiteScript({ ...editingSiteScript, Content: updatedScriptContent });
-                    setUpdatedContentFrom("CODE");
-                    setIsValidCode(true);
+                    setState({
+                        ...state,
+                        editingSiteScript: { ...editingSiteScript, Content: updatedScriptContent },
+                        updatedContentFrom: 'CODE',
+                        isValidCode: true
+                    });
                 } else {
-                    setIsValidCode(false);
+                    setState({
+                        ...state,
+                        isValidCode: false
+                    });
                 }
             } catch (error) {
                 console.warn("Code is not valid site script JSON");
@@ -264,6 +307,10 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
 
     const isLoading = appContext.isLoading;
     const [isValidForSave, validationMessage] = checkIsValidForSave();
+    if (!editingSiteScript) {
+        return null;
+    }
+    console.debug("editingSiteScript: ", editingSiteScript);
     return <div className={styles.SiteScriptEditor}>
         <div className={styles.row}>
             <div className={styles.columnLayout}>
@@ -376,7 +423,7 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
             headerText="Export Site Script"
             onRenderFooterContent={(p) => <Stack horizontalAlign="end" horizontal tokens={{ childrenGap: 10 }}>
                 <PrimaryButton iconProps={{ iconName: "Download" }} text="Download" onClick={() => currentExportPackage && currentExportPackage.download()} />
-                <DefaultButton text="Cancel" onClick={() => setIsExportUIOpen(false)} /></Stack>}>
+                <DefaultButton text="Cancel" onClick={() => setState({ ...state, isExportUIOpen: false })} /></Stack>}>
             <Pivot
                 selectedKey={currentExportType}
                 onLinkClick={(item) => onExportRequested(item.props.itemKey as ExportType)}

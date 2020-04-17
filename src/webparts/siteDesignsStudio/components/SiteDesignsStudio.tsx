@@ -17,6 +17,7 @@ import { useEffect, useState, useRef } from 'react';
 import { SiteDesignsServiceKey } from '../../../services/siteDesigns/SiteDesignsService';
 import { Link } from 'office-ui-fabric-react/lib/Link';
 import { MessageBar } from 'office-ui-fabric-react/lib/MessageBar';
+import { useTraceUpdate } from '../../../helpers/hooks';
 
 const AppLayout = (props: any) => {
   const [appState, execute] = useAppContext<IApplicationState, ActionType>();
@@ -160,7 +161,7 @@ const AppLayout = (props: any) => {
 
 
 const AppPage = (props: any) => {
-
+  useTraceUpdate("AppPage", props);
   const [appContext, action] = useAppContext<IApplicationState, ActionType>();
 
   const siteDesignsService = appContext.serviceScope.consume(SiteDesignsServiceKey);
