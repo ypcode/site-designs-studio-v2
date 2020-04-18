@@ -1,7 +1,7 @@
 import * as React from "react";
 import { ExportPackage } from "../../helpers/ExportPackage";
 import styles from "./ExportPackageViewer.module.scss";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import CodeEditor from "@monaco-editor/react";
 import { Icon, ActionButton } from "office-ui-fabric-react";
 
@@ -12,6 +12,13 @@ export interface IExportPackageViewerProps {
 export const ExportPackageViewer = (props: IExportPackageViewerProps) => {
 
     const [currentFile, setCurrentFile] = useState(props.exportPackage.allFiles && props.exportPackage.allFiles.length && props.exportPackage.allFiles[0]);
+
+    useEffect(() => {
+        const allFiles = props.exportPackage.allFiles;
+        if (allFiles && allFiles.length > 0) {
+            setCurrentFile(allFiles[0]);
+        }
+    }, [props.exportPackage]);
 
     const viewFileContent = (file: string) => {
         setCurrentFile(file);
@@ -63,6 +70,7 @@ export const ExportPackageViewer = (props: IExportPackageViewerProps) => {
                     height="65vh"
                     language={getContentLanguage(currentFile)}
                     options={{
+                        readOnly: true,
                         folding: true,
                         renderIndentGuides: true,
                         minimap: {

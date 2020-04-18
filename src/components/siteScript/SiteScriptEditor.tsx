@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useReducer } from "react";
 import styles from "./SiteScriptEditor.module.scss";
 import { TextField, PrimaryButton, Label, Stack, DefaultButton, ProgressIndicator, MessageBarType, CommandButton, IContextualMenuProps, Panel, PanelType, Pivot, PivotItem, Icon } from "office-ui-fabric-react";
 import { useAppContext } from "../../app/App";
@@ -22,16 +22,97 @@ export interface ISiteScriptEditorProps {
 }
 
 type ExportType = "json" | "PnPPowershell" | "PnPTemplate" | "o365_PS" | "o365_Bash";
+type UpdatedCodeFrom = "UI" | "CODE" | "OTHER";
 
 interface ISiteScriptEditorState {
-    editingSiteScript: ISiteScript;
-    updatedContentFrom: "UI" | "CODE" | null;
+    siteScriptMetadata: ISiteScript;
+    siteScriptContent: ISiteScriptContent;
+    updatedContentFrom: UpdatedCodeFrom;
     isValidCode: boolean;
     isSaving: boolean;
-    isExportUIOpen: boolean;
+    isExportUIVisible: boolean;
     currentExportPackage: ExportPackage;
     currentExportType: ExportType;
 }
+
+interface ISetSiteScriptAction {
+    type: "SET_SITE_SCRIPT";
+    siteScript: ISiteScript;
+}
+
+interface IUpdateSiteScriptMetadataAction {
+    type: "UPDATE_SITE_SCRIPT_METADATA";
+    siteScript: ISiteScript;
+}
+
+interface IUpdateSiteScriptContentAction {
+    type: "UPDATE_SITE_SCRIPT_CONTENT";
+    content: ISiteScriptContent;
+    from?: UpdatedCodeFrom;
+    isValidCode?: boolean;
+}
+
+interface ISetIsSavingAction {
+    type: "SET_ISSAVING";
+    isSaving: boolean;
+}
+
+interface ISetExportPackageAction {
+    type: "SET_EXPORTPACKAGE";
+    exportPackage: ExportPackage;
+    exportType?: ExportType;
+}
+
+type SiteScriptEditorAction = ISetSiteScriptAction
+    | IUpdateSiteScriptMetadataAction
+    | IUpdateSiteScriptContentAction
+    | ISetIsSavingAction
+    | ISetExportPackageAction;
+
+const SiteScriptEditorReducer: (state: ISiteScriptEditorState, action: SiteScriptEditorAction) => ISiteScriptEditorState =
+    (state, action) => {
+        let updatedState = state;
+        switch (action.type) {
+            case "SET_SITE_SCRIPT":
+                updatedState = {
+                    ...state,
+                    siteScriptMetadata: action.siteScript,
+                    siteScriptContent: action.siteScript.Content
+                };
+                break;
+            case "UPDATE_SITE_SCRIPT_METADATA":
+                updatedState = {
+                    ...state,
+                    siteScriptMetadata: action.siteScript ? { ...state.siteScriptMetadata, ...action.siteScript } : state.siteScriptMetadata
+                };
+                break;
+            case "UPDATE_SITE_SCRIPT_CONTENT":
+                updatedState = {
+                    ...state,
+                    siteScriptContent: action.content ? { ...state.siteScriptContent, ...action.content } : state.siteScriptContent,
+                    isValidCode: action.isValidCode || true,
+                    updatedContentFrom: action.from || "OTHER"
+                };
+                break;
+            case "SET_ISSAVING":
+                updatedState = { ...state, isSaving: action.isSaving };
+                break;
+            case "SET_EXPORTPACKAGE":
+                updatedState = {
+                    ...state,
+                    currentExportPackage: action.exportPackage,
+                    currentExportType: action.exportPackage ? action.exportType : "json",
+                    isExportUIVisible: !!action.exportPackage
+                };
+                break;
+            default:
+                console.debug("SiteScriptEditor:: state unchanged");
+                return state;
+        }
+
+        console.debug("SiteScriptEditor:: state changed: ", updatedState, " due to action ", action);
+        return updatedState;
+    };
 
 export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
     useTraceUpdate('SiteScriptEditor', props);
@@ -42,19 +123,21 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
     const siteScriptSchemaService = appContext.serviceScope.consume(SiteScriptSchemaServiceKey);
     const exportService = appContext.serviceScope.consume(ExportServiceKey);
 
-    const [state, setState] = useState<ISiteScriptEditorState>({
-        editingSiteScript: null,
+    const [state, dispatchState] = useReducer(SiteScriptEditorReducer, {
+        siteScriptMetadata: null,
+        siteScriptContent: null,
         currentExportPackage: null,
         currentExportType: "json",
-        isExportUIOpen: false,
+        isExportUIVisible: false,
         isSaving: false,
         isValidCode: true,
         updatedContentFrom: null
     });
-    const { editingSiteScript,
+    const { siteScriptMetadata,
+        siteScriptContent,
         isValidCode,
         updatedContentFrom,
-        isExportUIOpen,
+        isExportUIVisible,
         currentExportType,
         currentExportPackage,
         isSaving } = state;
@@ -70,7 +153,8 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
     // Use Effects
     useEffect(() => {
         if (!props.siteScript.Id) {
-            setState({ ...state, editingSiteScript: { ...props.siteScript } as ISiteScript });
+            dispatchState({ type: "SET_SITE_SCRIPT", siteScript: props.siteScript });
+
             if (titleFieldRef.current) {
                 titleFieldRef.current.focus();
             }
@@ -80,7 +164,7 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
         setLoading(true);
         console.debug("Loading site script...", props.siteScript.Id);
         siteDesignsService.getSiteScript(props.siteScript.Id).then(loadedSiteScript => {
-            setState({ ...state, editingSiteScript: loadedSiteScript });
+            dispatchState({ type: "SET_SITE_SCRIPT", siteScript: loadedSiteScript });
             console.debug("Loaded: ", loadedSiteScript);
         }).catch(error => {
             console.error(`The Site Script ${props.siteScript.Id} could not be loaded`, error);
@@ -90,88 +174,78 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
     }, [props.siteScript]);
 
     const onTitleChanged = (ev: any, title: string) => {
-        const newSiteScript = { ...editingSiteScript, Title: title };
-        setState({
-            ...state,
-            editingSiteScript: newSiteScript
-        });
+        const siteScript = { ...siteScriptMetadata, Title: title };
+        dispatchState({ type: "UPDATE_SITE_SCRIPT_METADATA", siteScript });
     };
 
-    let currentDescription = useRef<string>(editingSiteScript && editingSiteScript.Description);
+    let currentDescription = useRef<string>(siteScriptMetadata && siteScriptMetadata.Description);
     const onDescriptionChanging = (ev: any, description: string) => {
         currentDescription.current = description;
     };
 
     const onDescriptionInputBlur = (ev: any) => {
-        setState({
-            ...state,
-            editingSiteScript: { ...editingSiteScript, Description: currentDescription.current }
-        });
+        const siteScript = { ...siteScriptMetadata, Description: currentDescription.current };
+        dispatchState({ type: "UPDATE_SITE_SCRIPT_METADATA", siteScript });
     };
 
     const onVersionChanged = (ev: any, version: string) => {
         const versionInt = parseInt(version);
         if (!isNaN(versionInt)) {
-            setState({
-                ...state,
-                editingSiteScript: { ...editingSiteScript, Version: versionInt }
-            });
+            const siteScript = { ...siteScriptMetadata, Version: versionInt };
+            dispatchState({ type: "UPDATE_SITE_SCRIPT_METADATA", siteScript });
         }
     };
 
-    const onSiteScriptContentUpdatedFromUI = (updatedContent: ISiteScriptContent) => {
-        const newState = {
-            ...state,
-            updatedContentFrom: 'UI',
-            editingSiteScript: { ...editingSiteScript, Content: updatedContent }
-        } as ISiteScriptEditorState;
-       setState(newState);
+    const onSiteScriptContentUpdatedFromUI = (content: ISiteScriptContent) => {
+        console.log("SCRIPT CONTENT UPDATED FROM UI: ", content);
+        dispatchState({ type: "UPDATE_SITE_SCRIPT_CONTENT", content, from: "UI" });
     };
 
     const onSave = async () => {
-        setState({ ...state, isSaving: true });
+        dispatchState({ type: "SET_ISSAVING", isSaving: true });
         try {
-            await siteDesignsService.saveSiteScript(editingSiteScript);
+            const toSave: ISiteScript = { ...siteScriptMetadata, Content: state.siteScriptContent };
+            await siteDesignsService.saveSiteScript(toSave);
             const refreshedSiteScripts = await siteDesignsService.getSiteScripts();
             execute("SET_USER_MESSAGE", {
                 userMessage: {
-                    message: `${editingSiteScript.Title} has been successfully saved.`,
+                    message: `${siteScriptMetadata.Title} has been successfully saved.`,
                     messageType: MessageBarType.success
                 }
             } as ISetUserMessageArgs);
             execute("SET_ALL_AVAILABLE_SITE_SCRIPTS", { siteScripts: refreshedSiteScripts } as ISetAllAvailableSiteScripts);
             // If it is a brand new script, force redirect to the script list
-            if (!editingSiteScript.Id) {
+            if (!siteScriptMetadata.Id) {
                 execute("GO_TO", { page: "SiteScriptsList" } as IGoToActionArgs);
             }
         } catch (error) {
             execute("SET_USER_MESSAGE", {
                 userMessage: {
-                    message: `${editingSiteScript.Title} could not be saved.`,
+                    message: `${siteScriptMetadata.Title} could not be saved.`,
                     messageType: MessageBarType.error
                 }
             } as ISetUserMessageArgs);
             console.error(error);
         }
+        dispatchState({ type: "SET_ISSAVING", isSaving: false });
 
-        setState({ ...state, isSaving: false });
     };
 
     const onDelete = async () => {
         if (!await Confirm.show({
             title: `Delete Site Script`,
-            message: `Are you sure you want to delete ${(editingSiteScript && editingSiteScript.Title) || "this Site Script"} ?`
+            message: `Are you sure you want to delete ${(siteScriptMetadata && siteScriptMetadata.Title) || "this Site Script"} ?`
         })) {
             return;
         }
 
-        setState({ ...state, isSaving: true });
+        dispatchState({ type: "SET_ISSAVING", isSaving: true });
         try {
-            await siteDesignsService.deleteSiteScript(editingSiteScript);
+            await siteDesignsService.deleteSiteScript(siteScriptMetadata);
             const refreshedSiteScripts = await siteDesignsService.getSiteScripts();
             execute("SET_USER_MESSAGE", {
                 userMessage: {
-                    message: `${editingSiteScript.Title} has been successfully deleted.`,
+                    message: `${siteScriptMetadata.Title} has been successfully deleted.`,
                     messageType: MessageBarType.success
                 }
             } as ISetUserMessageArgs);
@@ -180,43 +254,39 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
         } catch (error) {
             execute("SET_USER_MESSAGE", {
                 userMessage: {
-                    message: `${editingSiteScript.Title} could not be deleted.`,
+                    message: `${siteScriptMetadata.Title} could not be deleted.`,
                     messageType: MessageBarType.error
                 }
             } as ISetUserMessageArgs);
             console.error(error);
         }
-        setState({ ...state, isSaving: false });
+        dispatchState({ type: "SET_ISSAVING", isSaving: false });
     };
 
     const onExportRequested = (exportType?: ExportType) => {
+        const toExport: ISiteScript = { ...siteScriptMetadata, Content: siteScriptContent };
         let exportPromise: Promise<ExportPackage> = null;
         switch (exportType) {
             case "PnPPowershell":
-                exportPromise = exportService.generateSiteScriptPnPPowershellExportPackage(editingSiteScript);
+                exportPromise = exportService.generateSiteScriptPnPPowershellExportPackage(toExport);
                 break;
             case "PnPTemplate":
                 break; // Not yet supported
             case "o365_PS":
-                exportPromise = exportService.generateSiteScriptO365CLIExportPackage(editingSiteScript, "Powershell");
+                exportPromise = exportService.generateSiteScriptO365CLIExportPackage(toExport, "Powershell");
                 break;
             case "o365_Bash":
-                exportPromise = exportService.generateSiteScriptO365CLIExportPackage(editingSiteScript, "Bash");
+                exportPromise = exportService.generateSiteScriptO365CLIExportPackage(toExport, "Bash");
                 break;
             case "json":
             default:
-                exportPromise = exportService.generateSiteScriptJSONExportPackage(editingSiteScript);
+                exportPromise = exportService.generateSiteScriptJSONExportPackage(toExport);
                 break;
         }
 
         if (exportPromise) {
             exportPromise.then(exportPackage => {
-                setState({
-                    ...state,
-                    currentExportPackage: exportPackage,
-                    currentExportType: exportType,
-                    isExportUIOpen: true
-                });
+                dispatchState({ type: "SET_EXPORTPACKAGE", exportPackage, exportType });
             });
         }
     };
@@ -231,31 +301,21 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
             clearTimeout(codeUpdateTimeoutHandle);
         }
 
-        if (updatedContentFrom == "UI") {
-            // Not trigger the change of state if the script content was updated from UI
-            console.debug("The code has been modified after a change in designer. The event will not be propagated");
-            setState({
-                ...state,
-                updatedContentFrom: null
-            });
-            return;
-        }
+        // if (updatedContentFrom == "UI") {
+        //     // Not trigger the change of state if the script content was updated from UI
+        //     console.debug("The code has been modified after a change in designer. The event will not be propagated");
+        //     dispatchState({ type: "UPDATE_SITE_SCRIPT", siteScript: null, from: "CODE" });
+        //     return;
+        // }
 
         codeUpdateTimeoutHandle = setTimeout(() => {
             try {
                 if (siteScriptSchemaService.validateSiteScriptJson(updatedCode)) {
-                    const updatedScriptContent = JSON.parse(updatedCode) as ISiteScriptContent;
-                    setState({
-                        ...state,
-                        editingSiteScript: { ...editingSiteScript, Content: updatedScriptContent },
-                        updatedContentFrom: 'CODE',
-                        isValidCode: true
-                    });
+                    const content = JSON.parse(updatedCode) as ISiteScriptContent;
+                    dispatchState({ type: "UPDATE_SITE_SCRIPT_CONTENT", content, isValidCode: true, from: "CODE" });
                 } else {
-                    setState({
-                        ...state,
-                        isValidCode: false
-                    });
+                    dispatchState({ type: "UPDATE_SITE_SCRIPT_CONTENT", content: null, isValidCode: false, from: "CODE" });
+
                 }
             } catch (error) {
                 console.warn("Code is not valid site script JSON");
@@ -281,6 +341,8 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
             console.error("An error occured while trying to configure code editor");
         });
 
+        const editorModel = editor.getModel();
+        console.log("Editor model: ", editorModel);
 
         editor.onDidChangeModelContent(ev => {
             if (codeEditorRef && codeEditorRef.current) {
@@ -290,11 +352,11 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
     };
 
     const checkIsValidForSave: () => [boolean, string?] = () => {
-        if (!editingSiteScript) {
+        if (!siteScriptMetadata) {
             return [false, "Current Site Script not defined"];
         }
 
-        if (!editingSiteScript.Title) {
+        if (!siteScriptMetadata.Title) {
             return [false, "Please set the title of the Site Script..."];
         }
 
@@ -307,10 +369,10 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
 
     const isLoading = appContext.isLoading;
     const [isValidForSave, validationMessage] = checkIsValidForSave();
-    if (!editingSiteScript) {
+    if (!siteScriptMetadata || !siteScriptContent) {
         return null;
     }
-    console.debug("editingSiteScript: ", editingSiteScript);
+
     return <div className={styles.SiteScriptEditor}>
         <div className={styles.row}>
             <div className={styles.columnLayout}>
@@ -332,7 +394,7 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
                             placeholder="Enter the name of the Site Script..."
                             borderless
                             componentRef={titleFieldRef}
-                            value={editingSiteScript.Title}
+                            value={siteScriptMetadata.Title}
                             onChange={onTitleChanged} />
                         {isLoading && <ProgressIndicator />}
                     </div>
@@ -340,7 +402,7 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
                         <Stack horizontal horizontalAlign="end" tokens={{ childrenGap: 15 }}>
                             <CommandButton disabled={isSaving} iconProps={{ iconName: "More" }} menuProps={{
                                 items: [
-                                    (editingSiteScript.Id && {
+                                    (siteScriptMetadata.Id && {
                                         key: 'deleteScript',
                                         text: 'Delete',
                                         iconProps: { iconName: 'Delete' },
@@ -360,18 +422,18 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
                     </div>}
                 </div>
                 <div className={styles.row}>
-                    {editingSiteScript.Id && <div className={styles.half}>
+                    {siteScriptMetadata.Id && <div className={styles.half}>
                         <div className={styles.row}>
                             <div className={styles.column8}>
                                 <TextField
                                     label="Id"
                                     readOnly
-                                    value={editingSiteScript.Id} />
+                                    value={siteScriptMetadata.Id} />
                             </div>
                             <div className={styles.column4}>
                                 <TextField
                                     label="Version"
-                                    value={editingSiteScript.Version.toString()}
+                                    value={siteScriptMetadata.Version.toString()}
                                     onChange={onVersionChanged} />
                             </div>
                         </div>
@@ -379,7 +441,7 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
                     <div className={styles.half}>
                         <TextField
                             label="Description"
-                            value={editingSiteScript.Description}
+                            value={siteScriptMetadata.Description}
                             multiline={true}
                             rows={2}
                             borderless
@@ -397,7 +459,7 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
                 <div className={styles.row}>
                     <div className={styles.designerWorkspace}>
                         <SiteScriptDesigner
-                            siteScriptContent={editingSiteScript.Content}
+                            siteScriptContent={siteScriptContent}
                             onSiteScriptContentUpdated={onSiteScriptContentUpdatedFromUI} />
                     </div>
                     <div className={styles.codeEditorWorkspace}>
@@ -411,19 +473,19 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
                                     enabled: false
                                 }
                             }}
-                            value={toJSON(editingSiteScript.Content)}
+                            value={toJSON(siteScriptContent)}
                             editorDidMount={editorDidMount}
                         />
                     </div>
                 </div>
             </div>
         </div>
-        <Panel isOpen={isExportUIOpen}
+        <Panel isOpen={isExportUIVisible}
             type={PanelType.large}
             headerText="Export Site Script"
             onRenderFooterContent={(p) => <Stack horizontalAlign="end" horizontal tokens={{ childrenGap: 10 }}>
                 <PrimaryButton iconProps={{ iconName: "Download" }} text="Download" onClick={() => currentExportPackage && currentExportPackage.download()} />
-                <DefaultButton text="Cancel" onClick={() => setState({ ...state, isExportUIOpen: false })} /></Stack>}>
+                <DefaultButton text="Cancel" onClick={() => dispatchState({ type: "SET_EXPORTPACKAGE", exportPackage: null })} /></Stack>}>
             <Pivot
                 selectedKey={currentExportType}
                 onLinkClick={(item) => onExportRequested(item.props.itemKey as ExportType)}
