@@ -17,7 +17,7 @@ export interface ISiteDesign {
 }
 
 export interface ISiteDesignWithGrantedRights extends ISiteDesign {
-	grantedRightsPrincipals: string[];
+	grantedRightsPrincipals?: string[];
 }
 
 export const SiteDesignEntitySchema = {

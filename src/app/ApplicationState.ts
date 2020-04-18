@@ -1,4 +1,4 @@
-import { ISiteDesign } from "../models/ISiteDesign";
+import { ISiteDesign, ISiteDesignWithGrantedRights } from "../models/ISiteDesign";
 import { IBaseAppState } from "./App";
 import { ActionType } from "./IApplicationAction";
 import { WebPartContext } from "@microsoft/sp-webpart-base";
@@ -15,7 +15,7 @@ export interface IUserMessage {
 
 export interface IApplicationState extends IBaseAppState<ActionType> {
     page: Page;
-    currentSiteDesign: ISiteDesign;
+    currentSiteDesign: ISiteDesignWithGrantedRights;
     currentSiteScript: ISiteScript;
     allAvailableSiteDesigns: ISiteDesign[];
     allAvailableSiteScripts: ISiteScript[];

@@ -184,7 +184,7 @@ const AppPage = (props: any) => {
   let content = null;
   switch (appContext.page) {
     case "SiteDesignEdition":
-      content = <SiteDesignEditor siteDesign={appContext.currentSiteDesign} />;
+      content = <SiteDesignEditor siteDesign={appContext.currentSiteDesign } />;
       break;
     case "SiteDesignsList":
       content = <SiteDesignsListInContext />;

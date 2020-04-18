@@ -40,12 +40,19 @@ class SitesService implements ISitesService {
         } as ISPSite));
     }
 
-    public async getSiteLists(siteUrl: string): Promise<IList[]> {
+    public async getSiteLists(webUrl: string): Promise<IList[]> {
         const serverUrl = `${document.location.protocol}//${document.location.host}`;
-        const web = Web(siteUrl);
+        const web = Web(webUrl);
         const lists = await web.lists.expand("RootFolder").select("Title", "Id", "RootFolder/ServerRelativeUrl").get();
-        return lists.map(l => ({
-            title: l.Title, url: `${serverUrl}${l.RootFolder.ServerRelativeUrl}`}));
+        return lists.map(l => {
+            const url = `${serverUrl}${l.RootFolder.ServerRelativeUrl}`;
+            const webRelativeUrl = url.replace(webUrl, "");
+            return {
+                title: l.Title,
+                url,
+                webRelativeUrl
+            };
+        });
     }
     
 }

@@ -22,7 +22,7 @@ export interface IGetSiteScriptFromExistingResourceResult {
 export interface ISiteDesignsService {
 	baseUrl: string;
 	getSiteDesigns(): Promise<ISiteDesign[]>;
-	getSiteDesign(siteDesignId: string): Promise<ISiteDesign>;
+	getSiteDesign(siteDesignId: string): Promise<ISiteDesignWithGrantedRights>;
 	saveSiteDesign(siteDesign: ISiteDesign): Promise<void>;
 	deleteSiteDesign(siteDesign: ISiteDesign | string): Promise<void>;
 	getSiteScripts(): Promise<ISiteScript[]>;
@@ -70,16 +70,29 @@ export class SiteDesignsService implements ISiteDesignsService {
 		});
 	}
 
+	private _getPrincipalName(spPrincipalName: string): string {
+		const splits = spPrincipalName.split("|");
+		return splits[splits.length - 1];
+	}
 	public getSiteDesigns(): Promise<ISiteDesign[]> {
 		return this._restRequest(
 			'/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.GetSiteDesigns'
 		).then((resp) => resp.value as ISiteDesign[]);
 	}
-	public getSiteDesign(siteDesignId: string): Promise<ISiteDesign> {
+	public getSiteDesign(siteDesignId: string): Promise<ISiteDesignWithGrantedRights> {
 		return this._restRequest(
 			'/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.GetSiteDesignMetadata',
 			{ id: siteDesignId }
-		).then((resp) => resp as ISiteDesign);
+		).then((resp) => {
+			const withRights = resp as ISiteDesignWithGrantedRights
+			// Get the granted
+			return this._restRequest("/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.GetSiteDesignRights", { id: siteDesignId })
+				.then(siteDesignRights => {
+					console.log("Granted rights: ", siteDesignRights);
+					withRights.grantedRightsPrincipals = siteDesignRights.value.map(r => this._getPrincipalName(r.PrincipalName));
+					return withRights;
+				});
+		});
 	}
 	public deleteSiteDesign(siteDesign: ISiteDesign | string): Promise<void> {
 		let id = typeof siteDesign === 'string' ? siteDesign as string : (siteDesign as ISiteDesign).Id;
@@ -136,7 +149,7 @@ export class SiteDesignsService implements ISiteDesignsService {
 		// Get the current rights of the site design
 		return this._restRequest("/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.GetSiteDesignRights", { id: siteDesignId })
 			.then(existingRights => {
-				const existingRightPrincipalNames: string[] = existingRights.value.map(r => r.PrincipalName);
+				const existingRightPrincipalNames: string[] = existingRights.value.map(r => this._getPrincipalName(r.PrincipalName));
 				// Remove the ones not included in specified principalNames
 				const toRevokePrincipalNames: string[] = existingRightPrincipalNames.filter(r => principalNames.indexOf(r) < 0);
 				const revokePromise = this._restRequest("/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.RevokeSiteDesignRights",
@@ -150,7 +163,7 @@ export class SiteDesignsService implements ISiteDesignsService {
 				const grantPromise = this._restRequest("/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.GrantSiteDesignRights",
 					{
 						id: siteDesignId,
-						principalNames: toRevokePrincipalNames,
+						principalNames: toGrantPrincipalNames,
 						grantedRights: 1, // Means "View" , only supported value currently
 					});
 

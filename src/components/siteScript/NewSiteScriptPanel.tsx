@@ -105,11 +105,12 @@ export const NewSiteScriptPanel = (props: INewSiteScriptPanelProps) => {
             <SitePicker label="Site" onSiteSelected={webUrl => {
                 setCreationArgs({ ...creationArgs, webUrl });
             }} serviceScope={appContext.serviceScope} />
-            <TextField label="Include lists"
-                multiline
-                rows={6}
-                placeholder="1 list relative URL per row"
-                onChange={(_, listUrlsStr) => setFromWebArgs({ ...fromWebArgs, includeLists: listUrlsStr.split('\n') })} />
+            <ListPicker serviceScope={appContext.serviceScope}
+                webUrl={creationArgs.webUrl}
+                label="Include lists"
+                multiselect
+                onListsSelected={(includeLists) => setFromWebArgs({ ...fromWebArgs, includeLists: !includeLists ? [] : includeLists.map(l => l.webRelativeUrl) })}
+            />
             <div className={styles.toggleRow}>
                 <div className={styles.column8}>Include Branding</div>
                 <div className={styles.column4}>
@@ -151,7 +152,7 @@ export const NewSiteScriptPanel = (props: INewSiteScriptPanelProps) => {
             <ListPicker serviceScope={appContext.serviceScope}
                 webUrl={creationArgs.webUrl}
                 label="List"
-                onListSelected={(listUrl) => setCreationArgs({ ...creationArgs, listUrl })}
+                onListSelected={(list) => setCreationArgs({ ...creationArgs, listUrl: list && list.url })}
             />
         </Stack>;
     };

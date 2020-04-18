@@ -1,23 +1,34 @@
 import * as React from "react";
-import { SortableContainer, SortableHandle, SortableElement } from 'react-sortable-hoc';
-import { ISiteDesign, WebTemplate } from "../../models/ISiteDesign";
 import { useState, useEffect } from "react";
-import styles from "./SiteDesignEditor.module.scss";
-import { TextField, Dropdown, Label, ActionButton, PrimaryButton, DocumentCardPreview, ImageFit, IDocumentCardPreviewProps, Spinner, SpinnerType, Stack, Toggle, DefaultButton, ProgressIndicator, MessageBarType } from "office-ui-fabric-react";
+import { find } from "@microsoft/sp-lodash-subset";
+import { Dropdown } from "office-ui-fabric-react/lib/Dropdown";
+import { Label } from "office-ui-fabric-react/lib/Label";
+import { Stack } from "office-ui-fabric-react/lib/Stack";
+import { MessageBarType } from "office-ui-fabric-react/lib/MessageBar";
+import { Toggle } from "office-ui-fabric-react/lib/Toggle";
+import { ProgressIndicator } from "office-ui-fabric-react/lib/ProgressIndicator";
+import { TextField } from "office-ui-fabric-react/lib/TextField";
+import { ImageFit } from "office-ui-fabric-react/lib/Image";
+import { DocumentCardPreview, IDocumentCardPreviewProps } from "office-ui-fabric-react/lib/DocumentCard";
+import { ActionButton, PrimaryButton, DefaultButton } from "office-ui-fabric-react/lib/Button";
+import { SortableContainer, SortableHandle, SortableElement } from 'react-sortable-hoc';
+import { PeoplePicker, PrincipalType, IPeoplePickerUserItem } from "@pnp/spfx-controls-react/lib/PeoplePicker";
 import { FilePicker, IFilePickerResult } from '@pnp/spfx-controls-react/lib/FilePicker';
 import { Placeholder } from "@pnp/spfx-controls-react/lib/Placeholder";
+import styles from "./SiteDesignEditor.module.scss";
+import { ISiteDesign, WebTemplate, ISiteDesignWithGrantedRights } from "../../models/ISiteDesign";
 import { useAppContext } from "../../app/App";
 import { IApplicationState } from "../../app/ApplicationState";
 import { ActionType, ISetAllAvailableSiteDesigns, IGoToActionArgs, ISetUserMessageArgs } from "../../app/IApplicationAction";
 import { Adder, IAddableItem } from "../common/adder/Adder";
 import { SiteDesignsServiceKey } from "../../services/siteDesigns/SiteDesignsService";
 import { ISiteScript } from "../../models/ISiteScript";
-import { find } from "@microsoft/sp-lodash-subset";
 import { Confirm } from "../common/confirm/Confirm";
 import { SiteDesignPreviewImageServiceKey } from "../../services/siteDesignPreviewImage/SiteDesignPreviewImageService";
+import { IPersonaProps } from "office-ui-fabric-react/lib/components/Persona";
 
 export interface ISiteDesignEditorProps {
-    siteDesign: ISiteDesign;
+    siteDesign: ISiteDesignWithGrantedRights;
 }
 
 export interface ISiteDesignAssociatedSiteScriptsProps extends ISiteDesignEditorProps {
@@ -102,7 +113,7 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
     const siteDesignsService = appContext.serviceScope.consume(SiteDesignsServiceKey);
     const siteDesignPreviewImageService = appContext.serviceScope.consume(SiteDesignPreviewImageServiceKey);
 
-    const [editingSiteDesign, setEditingSiteDesign] = useState<ISiteDesign>(props.siteDesign);
+    const [editingSiteDesign, setEditingSiteDesign] = useState<ISiteDesignWithGrantedRights>(props.siteDesign);
     const [isSaving, setIsSaving] = useState<boolean>(false);
 
     const setLoading = (loading: boolean) => {
@@ -210,6 +221,11 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
         }
 
         return [true];
+    };
+
+    const onGrantedChange = (items: IPersonaProps[]) => {
+        console.log("granted changed:", items);
+        setEditingSiteDesign({ ...editingSiteDesign, grantedRightsPrincipals: items.map(i => (i as any).loginName) });
     };
 
     const onSave = async () => {
@@ -379,6 +395,19 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
                                 />
                             </div>
                         </div>
+                        {/* <div className={styles.row}>
+                            <div className={styles.column}>
+                                <PeoplePicker
+                                    context={appContext.componentContext}
+                                    titleText="Granted to"
+                                    showtooltip={true}
+                                    isRequired={false}
+                                    selectedItems={onGrantedChange as any}
+                                    defaultSelectedUsers={editingSiteDesign.grantedRightsPrincipals}
+                                    principalTypes={[PrincipalType.User, PrincipalType.SecurityGroup]}
+                                    resolveDelay={1000} />
+                            </div>
+                        </div> */}
                         <div className={styles.row}>
                             <div className={styles.column}>
                                 <SiteDesignAssociatedScripts siteDesign={editingSiteDesign}
