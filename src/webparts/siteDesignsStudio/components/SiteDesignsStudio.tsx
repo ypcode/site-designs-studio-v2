@@ -198,7 +198,7 @@ const AppPage = (props: any) => {
     case "Home":
     default:
       content = <div>
-        <h2><Link onClick={() => action("GO_TO", { page: "SiteDesignsList" })}>Site Deisgns</Link></h2>
+        <h2><Link onClick={() => action("GO_TO", { page: "SiteDesignsList" })}>Site Designs</Link></h2>
         <SiteDesignsListInContext preview />
         <h2><Link onClick={() => action("GO_TO", { page: "SiteScriptsList" })}>Site Scripts</Link></h2>
         <SiteScriptsList preview />
