@@ -44,18 +44,18 @@ export class MockSiteDesignsService implements ISiteDesignsService {
 	public getSiteDesign(siteDesignId: string): Promise<ISiteDesign> {
 		return this._mockServiceCall(() => this._getSiteDesign(siteDesignId));
 	}
-	public saveSiteDesign(siteDesign: ISiteDesign): Promise<void> {
+	public saveSiteDesign(siteDesign: ISiteDesign): Promise<ISiteDesign> {
 		const action = () => {
 			if (siteDesign.Id) {
 				// Update
 				const existing = this._getSiteDesign(siteDesign.Id);
 				assign(existing, siteDesign);
-				return;
+				return siteDesign;
 			} else {
 				// Create
 				siteDesign.Id = (+new Date()).toString();
 				SiteDesignsMockData.push(siteDesign);
-				return;
+				return siteDesign;
 			}
 		};
 
@@ -77,18 +77,18 @@ export class MockSiteDesignsService implements ISiteDesignsService {
 		return this._mockServiceCall(() => this._getSiteScript(siteScriptId));
 	}
 
-	public saveSiteScript(siteScript: ISiteScript): Promise<void> {
+	public saveSiteScript(siteScript: ISiteScript): Promise<ISiteScript> {
 		const action = () => {
 			if (siteScript.Id) {
 				// Update
 				const existing = this._getSiteScript(siteScript.Id);
 				assign(existing, siteScript);
-				return;
+				return siteScript;
 			} else {
 				// Create
 				siteScript.Id = (+new Date()).toString();
 				SiteScriptsMockData.push(siteScript);
-				return;
+				return siteScript;
 			}
 		};
 		return this._mockServiceCall(action);

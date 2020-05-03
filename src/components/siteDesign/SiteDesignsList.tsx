@@ -101,7 +101,7 @@ export const SiteDesignsList = (props: ISiteDesignsListProps) => {
                     onRenderGridItem={renderGridItem}
                 />
                 {seeMore && <div className={styles.seeMore}>
-                    {`There are more than ${PREVIEW_ITEMS_COUNT} available Site Designs on your tenant. `}
+                    {`There are more than ${PREVIEW_ITEMS_COUNT} available Site Designs in your tenant. `}
                     <Link onClick={() => props.onSeeMore && props.onSeeMore()}>See all Site Designs</Link>
                 </div>}
             </div>

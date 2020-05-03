@@ -12,11 +12,10 @@ import { ImageFit } from "office-ui-fabric-react/lib/Image";
 import { DocumentCardPreview, IDocumentCardPreviewProps } from "office-ui-fabric-react/lib/DocumentCard";
 import { ActionButton, PrimaryButton, DefaultButton } from "office-ui-fabric-react/lib/Button";
 import { SortableContainer, SortableHandle, SortableElement } from 'react-sortable-hoc';
-import { PeoplePicker, PrincipalType, IPeoplePickerUserItem } from "@pnp/spfx-controls-react/lib/PeoplePicker";
 import { FilePicker, IFilePickerResult } from '@pnp/spfx-controls-react/lib/FilePicker';
 import { Placeholder } from "@pnp/spfx-controls-react/lib/Placeholder";
 import styles from "./SiteDesignEditor.module.scss";
-import { ISiteDesign, WebTemplate, ISiteDesignWithGrantedRights } from "../../models/ISiteDesign";
+import { WebTemplate, ISiteDesignWithGrantedRights, ISiteDesignGrantedPrincipal } from "../../models/ISiteDesign";
 import { useAppContext } from "../../app/App";
 import { IApplicationState } from "../../app/ApplicationState";
 import { ActionType, ISetAllAvailableSiteDesigns, IGoToActionArgs, ISetUserMessageArgs } from "../../app/IApplicationAction";
@@ -24,8 +23,11 @@ import { Adder, IAddableItem } from "../common/adder/Adder";
 import { SiteDesignsServiceKey } from "../../services/siteDesigns/SiteDesignsService";
 import { ISiteScript } from "../../models/ISiteScript";
 import { Confirm } from "../common/confirm/Confirm";
+import { PeoplePicker, PrincipalType } from "../common/peoplePicker/PeoplePicker";
 import { SiteDesignPreviewImageServiceKey } from "../../services/siteDesignPreviewImage/SiteDesignPreviewImageService";
-import { IPersonaProps } from "office-ui-fabric-react/lib/components/Persona";
+import { getPrincipalTypeFromName, getPrincipalAlias } from "../../utils/spUtils";
+import { Icon } from "office-ui-fabric-react/lib/Icon";
+import { IPrincipal } from "../../models/IPrincipal";
 
 export interface ISiteDesignEditorProps {
     siteDesign: ISiteDesignWithGrantedRights;
@@ -128,6 +130,11 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
 
         setLoading(true);
         siteDesignsService.getSiteDesign(props.siteDesign.Id).then(siteDesign => {
+            // Ensure associated site scripts from props are added to edited site design
+            const presetAssociatedSiteScripts = props.siteDesign.SiteScriptIds
+                ? props.siteDesign.SiteScriptIds.filter(ssId => siteDesign.SiteScriptIds.indexOf(ssId) < 0)
+                : [];
+            siteDesign.SiteScriptIds.push(...presetAssociatedSiteScripts);
             setEditingSiteDesign(siteDesign);
         }).catch(error => {
             console.error(`The Site Design ${props.siteDesign.Id} could not be loaded`, error);
@@ -223,9 +230,16 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
         return [true];
     };
 
-    const onGrantedChange = (items: IPersonaProps[]) => {
-        console.log("granted changed:", items);
-        setEditingSiteDesign({ ...editingSiteDesign, grantedRightsPrincipals: items.map(i => (i as any).loginName) });
+    const onGrantedChange = (items: IPrincipal[]) => {
+        const grantedRightsPrincipals: ISiteDesignGrantedPrincipal[] = items.map(i => (
+            {
+                id: null,
+                displayName: i.displayName,
+                principalName: i.principalName,
+                type: i.type || getPrincipalTypeFromName(i.principalName),
+                alias: getPrincipalAlias(i)
+            }));
+        setEditingSiteDesign({ ...editingSiteDesign, grantedRightsPrincipals });
     };
 
     const onSave = async () => {
@@ -302,7 +316,7 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
 
     const isLoading = appContext.isLoading;
     const [isValid, validationMessage] = isValidForSave();
-    return <div className={styles.SiteDesignEditor}>
+    return <div>
         <div className={styles.row}>
             <div className={styles.columnLayout}>
                 <div className={styles.row}>
@@ -329,7 +343,7 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
                     </div>
                     {!isLoading && <div className={`${styles.column1} ${styles.righted}`}>
                         <Stack horizontal horizontalAlign="end" tokens={{ childrenGap: 15 }}>
-                            <DefaultButton disabled={isSaving} text="Delete" iconProps={{ iconName: "Delete" }} onClick={() => onDelete()} />
+                            {editingSiteDesign.Id && <DefaultButton disabled={isSaving} text="Delete" iconProps={{ iconName: "Delete" }} onClick={() => onDelete()} />}
                             <PrimaryButton disabled={isSaving || !isValid} title={!isValid && validationMessage} text="Save" iconProps={{ iconName: "Save" }} onClick={() => onSave()} />
                         </Stack>
                     </div>}
@@ -351,13 +365,13 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
                                         { key: WebTemplate.CommunicationSite.toString(), text: 'Communication Site' }
                                     ]}
                                     selectedKey={editingSiteDesign.WebTemplate}
-                                    onChanged={(v) => onWebTemplateChanged(v.key as string)}
+                                    onChange={(_, v) => onWebTemplateChanged(v.key as string)}
                                 />
                             </div>
                             <div className={styles.column2}>
                                 <TextField
                                     label="Version"
-                                    value={editingSiteDesign.Version.toString()}
+                                    value={editingSiteDesign.Version && editingSiteDesign.Version.toString()}
                                     onChange={onVersionChanged} />
                             </div>
                         </div>}
@@ -370,7 +384,7 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
                                         { key: WebTemplate.CommunicationSite.toString(), text: 'Communication Site' }
                                     ]}
                                     selectedKey={editingSiteDesign.WebTemplate}
-                                    onChanged={(v) => onWebTemplateChanged(v.key as string)}
+                                    onChange={(_, v) => onWebTemplateChanged(v.key as string)}
                                 />
                             </div>
                         </div>}
@@ -395,19 +409,23 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
                                 />
                             </div>
                         </div>
-                        {/* <div className={styles.row}>
+                        <div className={styles.row}>
                             <div className={styles.column}>
                                 <PeoplePicker
-                                    context={appContext.componentContext}
-                                    titleText="Granted to"
-                                    showtooltip={true}
-                                    isRequired={false}
-                                    selectedItems={onGrantedChange as any}
-                                    defaultSelectedUsers={editingSiteDesign.grantedRightsPrincipals}
-                                    principalTypes={[PrincipalType.User, PrincipalType.SecurityGroup]}
-                                    resolveDelay={1000} />
+                                    serviceScope={appContext.serviceScope}
+                                    onChange={onGrantedChange}
+                                    selectedItems={editingSiteDesign.grantedRightsPrincipals || []}
+                                    principalType={PrincipalType.All}
+                                    label="Granted to"
+                                    typePicker="normal"
+                                />
+                                {(!editingSiteDesign.grantedRightsPrincipals || editingSiteDesign.grantedRightsPrincipals.length == 0)
+                                    && <Label styles={{ root: { fontSize: 12 } }}>
+                                        <Icon iconName="InfoSolid" styles={{ root: { marginRight: 10 } }} />
+                                        If nobody is explicity granted, this Site Design will be available for everyone
+                                        </Label>}
                             </div>
-                        </div> */}
+                        </div>
                         <div className={styles.row}>
                             <div className={styles.column}>
                                 <SiteDesignAssociatedScripts siteDesign={editingSiteDesign}
@@ -459,7 +477,6 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
                                 onChange={onPreviewImageAltTextChanged}
                             />}
                         </div>
-
                     </div>
                 </div>}
             </div>

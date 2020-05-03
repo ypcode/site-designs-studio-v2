@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useState, useEffect, useRef, useReducer } from "react";
+import { useEffect, useRef, useReducer } from "react";
 import styles from "./SiteScriptEditor.module.scss";
 import { TextField, PrimaryButton, Label, Stack, DefaultButton, ProgressIndicator, MessageBarType, CommandButton, IContextualMenuProps, Panel, PanelType, Pivot, PivotItem, Icon } from "office-ui-fabric-react";
 import { useAppContext } from "../../app/App";
@@ -15,7 +15,9 @@ import { toJSON } from "../../utils/jsonUtils";
 import { ExportServiceKey } from "../../services/export/ExportService";
 import { ExportPackage } from "../../helpers/ExportPackage";
 import { ExportPackageViewer } from "../exportPackageViewer/ExportPackageViewer";
+import { SiteDesignPicker, NEW_SITE_DESIGN_KEY } from "../common/siteDesignPicker/SiteDesignPicker";
 import { useTraceUpdate } from "../../helpers/hooks";
+import { createNewSiteDesign } from "../../helpers/SiteDesignsHelpers";
 
 export interface ISiteScriptEditorProps {
     siteScript: ISiteScript;
@@ -30,6 +32,7 @@ interface ISiteScriptEditorState {
     updatedContentFrom: UpdatedCodeFrom;
     isValidCode: boolean;
     isSaving: boolean;
+    isAssociatingToSiteDesign: boolean;
     isExportUIVisible: boolean;
     currentExportPackage: ExportPackage;
     currentExportType: ExportType;
@@ -63,11 +66,17 @@ interface ISetExportPackageAction {
     exportType?: ExportType;
 }
 
+interface ISetIsAssociatingToSiteDesign {
+    type: "SET_ISASSOCIATINGTOSITEDESIGN";
+    isAssociatingToSiteDesign: boolean;
+}
+
 type SiteScriptEditorAction = ISetSiteScriptAction
     | IUpdateSiteScriptMetadataAction
     | IUpdateSiteScriptContentAction
     | ISetIsSavingAction
-    | ISetExportPackageAction;
+    | ISetExportPackageAction
+    | ISetIsAssociatingToSiteDesign;
 
 const SiteScriptEditorReducer: (state: ISiteScriptEditorState, action: SiteScriptEditorAction) => ISiteScriptEditorState =
     (state, action) => {
@@ -105,6 +114,12 @@ const SiteScriptEditorReducer: (state: ISiteScriptEditorState, action: SiteScrip
                     isExportUIVisible: !!action.exportPackage
                 };
                 break;
+            case "SET_ISASSOCIATINGTOSITEDESIGN":
+                updatedState = {
+                    ...state,
+                    isAssociatingToSiteDesign: action.isAssociatingToSiteDesign
+                };
+                break;
             default:
                 console.debug("SiteScriptEditor:: state unchanged");
                 return state;
@@ -130,21 +145,23 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
         currentExportType: "json",
         isExportUIVisible: false,
         isSaving: false,
+        isAssociatingToSiteDesign: false,
         isValidCode: true,
         updatedContentFrom: null
     });
     const { siteScriptMetadata,
         siteScriptContent,
         isValidCode,
-        updatedContentFrom,
         isExportUIVisible,
         currentExportType,
         currentExportPackage,
+        isAssociatingToSiteDesign,
         isSaving } = state;
 
     // Use refs
     const codeEditorRef = useRef<any>();
     const titleFieldRef = useRef<any>();
+    const selectedSiteDesignRef = useRef<string>();
 
 
     const setLoading = (loading: boolean) => {
@@ -197,15 +214,15 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
     };
 
     const onSiteScriptContentUpdatedFromUI = (content: ISiteScriptContent) => {
-        console.log("SCRIPT CONTENT UPDATED FROM UI: ", content);
         dispatchState({ type: "UPDATE_SITE_SCRIPT_CONTENT", content, from: "UI" });
     };
 
     const onSave = async () => {
         dispatchState({ type: "SET_ISSAVING", isSaving: true });
         try {
+            const isNewSiteScript = !siteScriptMetadata.Id;
             const toSave: ISiteScript = { ...siteScriptMetadata, Content: state.siteScriptContent };
-            await siteDesignsService.saveSiteScript(toSave);
+            const updated = await siteDesignsService.saveSiteScript(toSave);
             const refreshedSiteScripts = await siteDesignsService.getSiteScripts();
             execute("SET_USER_MESSAGE", {
                 userMessage: {
@@ -214,9 +231,17 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
                 }
             } as ISetUserMessageArgs);
             execute("SET_ALL_AVAILABLE_SITE_SCRIPTS", { siteScripts: refreshedSiteScripts } as ISetAllAvailableSiteScripts);
-            // If it is a brand new script, force redirect to the script list
-            if (!siteScriptMetadata.Id) {
-                execute("GO_TO", { page: "SiteScriptsList" } as IGoToActionArgs);
+            dispatchState({ type: "SET_SITE_SCRIPT", siteScript: updated });
+            if (isNewSiteScript) {
+                // Ask if the new Site Script should be associated to a Site Design
+                if (await Confirm.show({
+                    title: `Associate to Site Design`,
+                    message: `Do you want to associate the new ${(siteScriptMetadata && siteScriptMetadata.Title)} to a Site Design ?`,
+                    cancelLabel: 'No',
+                    okLabel: 'Yes'
+                })) {
+                    dispatchState({ type: "SET_ISASSOCIATINGTOSITEDESIGN", isAssociatingToSiteDesign: true });
+                }
             }
         } catch (error) {
             execute("SET_USER_MESSAGE", {
@@ -261,6 +286,14 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
             console.error(error);
         }
         dispatchState({ type: "SET_ISSAVING", isSaving: false });
+    };
+
+    const onAssociateSiteScript = () => {
+        if (selectedSiteDesignRef.current != NEW_SITE_DESIGN_KEY) {
+            execute("EDIT_SITE_DESIGN", { siteDesign: { Id: selectedSiteDesignRef.current }, additionalSiteScriptIds: [siteScriptMetadata.Id] });
+        } else if (selectedSiteDesignRef.current) {
+            execute("EDIT_SITE_DESIGN", { siteDesign: createNewSiteDesign(), additionalSiteScriptIds: [siteScriptMetadata.Id] });
+        }
     };
 
     const onExportRequested = (exportType?: ExportType) => {
@@ -480,6 +513,24 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
                 </div>
             </div>
         </div>
+        {/* Association to a Site Design */}
+        <Panel isOpen={isAssociatingToSiteDesign}
+            type={PanelType.smallFixedFar}
+            headerText="Associate to a Site Design"
+            onRenderFooterContent={(p) => <Stack horizontalAlign="end" horizontal tokens={{ childrenGap: 10 }}>
+                <PrimaryButton iconProps={{ iconName: "Check" }} text="Continue" onClick={() => onAssociateSiteScript()} />
+                <DefaultButton text="Cancel" onClick={() => dispatchState({ type: "SET_ISASSOCIATINGTOSITEDESIGN", isAssociatingToSiteDesign: false })} /></Stack>}
+        >
+            <SiteDesignPicker serviceScope={appContext.serviceScope}
+                label="Site Design"
+                onSiteDesignSelected={(siteDesignId) => {
+                    console.log("Selected site design: ", siteDesignId);
+                    selectedSiteDesignRef.current = siteDesignId;
+                }}
+                hasNewSiteDesignOption
+                displayPreview />
+        </Panel>
+        {/* Export options */}
         <Panel isOpen={isExportUIVisible}
             type={PanelType.large}
             headerText="Export Site Script"
@@ -499,5 +550,5 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
             </Pivot>
             {currentExportPackage && <ExportPackageViewer exportPackage={currentExportPackage} />}
         </Panel>
-    </div>;
+    </div >;
 };

@@ -1,3 +1,5 @@
+import { IPrincipal } from "./IPrincipal";
+
 export enum WebTemplate {
 	None = 0,
 	TeamSite = 64,
@@ -16,8 +18,12 @@ export interface ISiteDesign {
 	Version: number;
 }
 
+export interface ISiteDesignGrantedPrincipal extends IPrincipal {
+	alias?: string;
+}
+
 export interface ISiteDesignWithGrantedRights extends ISiteDesign {
-	grantedRightsPrincipals?: string[];
+	grantedRightsPrincipals?: ISiteDesignGrantedPrincipal[];
 }
 
 export const SiteDesignEntitySchema = {

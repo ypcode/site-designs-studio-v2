@@ -18,6 +18,7 @@ export interface IGoToActionArgs {
 
 export interface IEditSiteDesignActionArgs {
     siteDesign: ISiteDesign;
+    additionalSiteScriptIds?: string[];
 }
 
 export interface IEditSiteScriptActionArgs {

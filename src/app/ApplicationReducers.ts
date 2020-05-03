@@ -10,6 +10,7 @@ export const Reducers: (applicationState: IApplicationState, action: IAction<Act
 
         const actionArgs = action as any;
 
+
         switch (action.type) {
             case "GO_TO":
                 return {
@@ -17,10 +18,15 @@ export const Reducers: (applicationState: IApplicationState, action: IAction<Act
                     page: actionArgs.page
                 };
             case "EDIT_SITE_DESIGN":
+                const editSiteDesignAction = (actionArgs as IEditSiteDesignActionArgs);
+                const currentSiteDesign = editSiteDesignAction.siteDesign;
+                if (editSiteDesignAction.additionalSiteScriptIds) {
+                    currentSiteDesign.SiteScriptIds = [...(currentSiteDesign.SiteScriptIds || []), ...editSiteDesignAction.additionalSiteScriptIds];
+                }
                 return {
                     ...applicationState,
                     page: "SiteDesignEdition",
-                    currentSiteDesign: (actionArgs as IEditSiteDesignActionArgs).siteDesign
+                    currentSiteDesign: currentSiteDesign
                 };
             case "EDIT_SITE_SCRIPT":
                 return {

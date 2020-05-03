@@ -11,7 +11,6 @@ import { ServiceScope } from '@microsoft/sp-core-library';
 import { Label } from "office-ui-fabric-react/lib/Label";
 import { useState } from "react";
 import { TextField, IconButton } from "office-ui-fabric-react";
-import { round } from "@microsoft/sp-lodash-subset";
 
 export interface ISitePickerProps {
     serviceScope: ServiceScope;

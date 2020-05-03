@@ -1,9 +1,10 @@
 import { ISiteScript, ISiteScriptContent } from '../../models/ISiteScript';
-import { ISiteDesign, WebTemplate, ISiteDesignWithGrantedRights } from '../../models/ISiteDesign';
+import { ISiteDesign, WebTemplate, ISiteDesignWithGrantedRights, ISiteDesignGrantedPrincipal } from '../../models/ISiteDesign';
 import { ServiceScope, ServiceKey } from '@microsoft/sp-core-library';
 import { SPHttpClient, ISPHttpClientOptions, SPHttpClientConfiguration } from '@microsoft/sp-http';
-import { assign } from '@microsoft/sp-lodash-subset';
+import { assign, find } from '@microsoft/sp-lodash-subset';
 import { ISiteScriptSchemaService, SiteScriptSchemaServiceKey } from '../siteScriptSchema/SiteScriptSchemaService';
+import { getPrincipalTypeFromName } from '../../utils/spUtils';
 
 export interface IGetSiteScriptFromWebOptions {
 	includeBranding?: boolean;
@@ -23,11 +24,11 @@ export interface ISiteDesignsService {
 	baseUrl: string;
 	getSiteDesigns(): Promise<ISiteDesign[]>;
 	getSiteDesign(siteDesignId: string): Promise<ISiteDesignWithGrantedRights>;
-	saveSiteDesign(siteDesign: ISiteDesign): Promise<void>;
+	saveSiteDesign(siteDesign: ISiteDesign): Promise<ISiteDesignWithGrantedRights>;
 	deleteSiteDesign(siteDesign: ISiteDesign | string): Promise<void>;
 	getSiteScripts(): Promise<ISiteScript[]>;
 	getSiteScript(siteScriptId: string): Promise<ISiteScript>;
-	saveSiteScript(siteScript: ISiteScript): Promise<void>;
+	saveSiteScript(siteScript: ISiteScript): Promise<ISiteScript>;
 	deleteSiteScript(siteScript: ISiteScript | string): Promise<void>;
 	applySiteDesign(siteDesignId: string, webUrl: string): Promise<void>;
 	getSiteScriptFromList(listUrl: string): Promise<IGetSiteScriptFromExistingResourceResult>;
@@ -51,7 +52,7 @@ export class SiteDesignsService implements ISiteDesignsService {
 		return (this.baseUrl + '//' + relativeUrl).replace(/\/{2,}/, '/');
 	}
 
-	private _restRequest(url: string, params: any = null): Promise<any> {
+	private async _restRequest<TResponse>(url: string, params: any = null): Promise<TResponse> {
 		const restUrl = this._getEffectiveUrl(url);
 		const options: ISPHttpClientOptions = {
 			body: JSON.stringify(params),
@@ -61,50 +62,62 @@ export class SiteDesignsService implements ISiteDesignsService {
 				'ODATA-VERSION': '4.0'
 			}
 		};
-		return this.spHttpClient.post(restUrl, SPHttpClient.configurations.v1, options).then((response) => {
-			if (response.status == 204) {
-				return {};
-			} else {
-				return response.json();
-			}
-		});
+		const httpResponse = await this.spHttpClient.post(restUrl, SPHttpClient.configurations.v1, options);
+		if (httpResponse.status == 204) {
+			return {} as TResponse;
+		} else {
+			return httpResponse.json() as any as TResponse;
+		}
 	}
 
-	private _getPrincipalName(spPrincipalName: string): string {
-		const splits = spPrincipalName.split("|");
-		return splits[splits.length - 1];
+	public async getSiteDesigns(): Promise<ISiteDesign[]> {
+		try {
+			const response = await this._restRequest<{ value: any[] }>(
+				'/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.GetSiteDesigns'
+			);
+			return response.value as ISiteDesign[];
+		} catch (error) {
+			console.error("An error occured while trying to get site designs", error);
+			return [];
+		}
 	}
-	public getSiteDesigns(): Promise<ISiteDesign[]> {
-		return this._restRequest(
-			'/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.GetSiteDesigns'
-		).then((resp) => resp.value as ISiteDesign[]);
+
+	public async getSiteDesign(siteDesignId: string): Promise<ISiteDesignWithGrantedRights> {
+
+		try {
+			const siteDesign = await this._restRequest<ISiteDesignWithGrantedRights>(
+				'/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.GetSiteDesignMetadata',
+				{ id: siteDesignId }
+			);
+
+			const rights = await this._restRequest<{ value: { PrincipalName: string; DisplayName: string; }[] }>("/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.GetSiteDesignRights", { id: siteDesignId });
+			const existingRightPrincipalNames: ISiteDesignGrantedPrincipal[] = rights.value.map(r => ({
+				id: null,
+				displayName: r.DisplayName,
+				principalName: r.PrincipalName,
+				type: getPrincipalTypeFromName(r.PrincipalName)
+			})
+			);
+			siteDesign.grantedRightsPrincipals = existingRightPrincipalNames;
+			return siteDesign;
+		} catch (error) {
+			console.error(`An error occured while trying to get site design ${siteDesignId}`, error);
+			return null;
+		}
 	}
-	public getSiteDesign(siteDesignId: string): Promise<ISiteDesignWithGrantedRights> {
-		return this._restRequest(
-			'/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.GetSiteDesignMetadata',
-			{ id: siteDesignId }
-		).then((resp) => {
-			const withRights = resp as ISiteDesignWithGrantedRights
-			// Get the granted
-			return this._restRequest("/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.GetSiteDesignRights", { id: siteDesignId })
-				.then(siteDesignRights => {
-					console.log("Granted rights: ", siteDesignRights);
-					withRights.grantedRightsPrincipals = siteDesignRights.value.map(r => this._getPrincipalName(r.PrincipalName));
-					return withRights;
-				});
-		});
-	}
-	public deleteSiteDesign(siteDesign: ISiteDesign | string): Promise<void> {
+
+	public async deleteSiteDesign(siteDesign: ISiteDesign | string): Promise<void> {
 		let id = typeof siteDesign === 'string' ? siteDesign as string : (siteDesign as ISiteDesign).Id;
-		return this._restRequest(
+		return this._restRequest<void>(
 			'/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.DeleteSiteDesign',
 			{ id: id }
 		);
 	}
-	public saveSiteDesign(siteDesign: ISiteDesign): Promise<void> {
+
+	public async saveSiteDesign(siteDesign: ISiteDesign): Promise<ISiteDesignWithGrantedRights> {
 		if (siteDesign.Id) {
 			// Update
-			return this._restRequest(
+			await this._restRequest<ISiteDesign>(
 				'/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.UpdateSiteDesign',
 				{
 					updateInfo: {
@@ -119,17 +132,10 @@ export class SiteDesignsService implements ISiteDesignsService {
 						IsDefault: siteDesign.IsDefault
 					}
 				}
-			).then(() => {
-				const withGrantedRights = (siteDesign as ISiteDesignWithGrantedRights);
-				if (withGrantedRights.grantedRightsPrincipals) {
-					return this._setSiteDesignRights(siteDesign.Id, withGrantedRights.grantedRightsPrincipals);
-				} else {
-					return Promise.resolve();
-				}
-			});
+			);
 		} else {
 			// Create
-			return this._restRequest(
+			const created = await this._restRequest<ISiteDesign>(
 				'/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.CreateSiteDesign',
 				{
 					info: {
@@ -142,55 +148,61 @@ export class SiteDesignsService implements ISiteDesignsService {
 					}
 				}
 			);
+			siteDesign.Id = created.Id;
 		}
+
+		const withGrantedRights = (siteDesign as ISiteDesignWithGrantedRights);
+		if (withGrantedRights.grantedRightsPrincipals) {
+			await this._setSiteDesignRights(siteDesign.Id, withGrantedRights.grantedRightsPrincipals);
+		}
+
+		return siteDesign;
 	}
 
-	private _setSiteDesignRights(siteDesignId: string, principalNames: string[]): Promise<void> {
+	private async _setSiteDesignRights(siteDesignId: string, principals: ISiteDesignGrantedPrincipal[]): Promise<void> {
 		// Get the current rights of the site design
-		return this._restRequest("/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.GetSiteDesignRights", { id: siteDesignId })
-			.then(existingRights => {
-				const existingRightPrincipalNames: string[] = existingRights.value.map(r => this._getPrincipalName(r.PrincipalName));
-				// Remove the ones not included in specified principalNames
-				const toRevokePrincipalNames: string[] = existingRightPrincipalNames.filter(r => principalNames.indexOf(r) < 0);
-				const revokePromise = this._restRequest("/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.RevokeSiteDesignRights",
-					{
-						id: siteDesignId,
-						principalNames: toRevokePrincipalNames
-					});
-
-				// Add the ones from principalNames not included in existing
-				const toGrantPrincipalNames: string[] = principalNames.filter(pn => existingRightPrincipalNames.indexOf(pn) < 0);
-				const grantPromise = this._restRequest("/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.GrantSiteDesignRights",
-					{
-						id: siteDesignId,
-						principalNames: toGrantPrincipalNames,
-						grantedRights: 1, // Means "View" , only supported value currently
-					});
-
-				return Promise.all([revokePromise, grantPromise]).then(() => { });
+		const existingRights = await this._restRequest<{ value: { PrincipalName: string }[] }>("/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.GetSiteDesignRights", { id: siteDesignId });
+		const existingRightPrincipalNames: string[] = existingRights.value.map(r => r.PrincipalName);
+		// Remove the ones not included in specified principalNames
+		const toRevokePrincipalNames: string[] = existingRightPrincipalNames.filter(r => !find(principals, p => p.principalName == r));
+		// Add the ones from principalNames not included in existing
+		// Aliases must be set to be granted...
+		const toGrantPrincipalNames: string[] = principals
+			.filter(p => !!p.alias)
+			.filter(p => existingRightPrincipalNames.indexOf(p.principalName) < 0)
+			.map(p => p.alias);
+		await this._restRequest("/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.RevokeSiteDesignRights",
+			{
+				id: siteDesignId,
+				principalNames: toRevokePrincipalNames
+			});
+		await this._restRequest("/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.GrantSiteDesignRights",
+			{
+				id: siteDesignId,
+				principalNames: toGrantPrincipalNames,
+				grantedRights: 1, // Means "View" , only supported value currently
 			});
 	}
 
-	public getSiteScripts(): Promise<ISiteScript[]> {
-		return this._restRequest(
+	public async getSiteScripts(): Promise<ISiteScript[]> {
+		const response = await this._restRequest<{ value: ISiteScript[] }>(
 			'/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.GetSiteScripts'
-		).then((resp) => resp.value as ISiteScript[]);
+		);
+		return response.value;
 	}
 
-	public getSiteScript(siteScriptId: string): Promise<ISiteScript> {
-		return this._restRequest(
+	public async getSiteScript(siteScriptId: string): Promise<ISiteScript> {
+		const siteScript = await this._restRequest<ISiteScript>(
 			'/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.GetSiteScriptMetadata',
 			{ id: siteScriptId }
-		).then((resp) => {
-			let siteScript = resp as ISiteScript;
-			siteScript.Content = JSON.parse(siteScript.Content as any);
-			return siteScript;
-		});
+		);
+		siteScript.Content = JSON.parse(siteScript.Content as any);
+		return siteScript;
 	}
 
-	public saveSiteScript(siteScript: ISiteScript): Promise<void> {
+	public async saveSiteScript(siteScript: ISiteScript): Promise<ISiteScript> {
 		if (siteScript.Id) {
-			return this._restRequest(
+			await this._restRequest(
 				'/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.UpdateSiteScript',
 				{
 					updateInfo: {
@@ -203,12 +215,15 @@ export class SiteDesignsService implements ISiteDesignsService {
 				}
 			);
 		} else {
-			return this._restRequest(
+			const created = await this._restRequest<ISiteScript>(
 				`/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.CreateSiteScript(Title=@title)?@title='${siteScript.Title}'`,
 				siteScript.Content
 			);
+			siteScript.Id = created.Id;
 		}
+		return siteScript;
 	}
+
 	public deleteSiteScript(siteScript: ISiteScript | string): Promise<void> {
 		let id = typeof siteScript === 'string' ? siteScript as string : (siteScript as ISiteScript).Id;
 		return this._restRequest(
@@ -221,18 +236,19 @@ export class SiteDesignsService implements ISiteDesignsService {
 		// TODO Implement
 		return null;
 	}
-	public getSiteScriptFromList(listUrl: string): Promise<IGetSiteScriptFromExistingResourceResult> {
-		return this._restRequest('/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.GetSiteScriptFromList', {
+
+	public async getSiteScriptFromList(listUrl: string): Promise<IGetSiteScriptFromExistingResourceResult> {
+		const response = await this._restRequest<{ value: string }>('/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.GetSiteScriptFromList', {
 			listUrl
-		}).then(result => {
-			console.log("result is : ", result);
-			const defaultContent = this.schemaService.getNewSiteScript();
-			const siteScriptContent = assign(defaultContent, JSON.parse(result.value)) as ISiteScriptContent;
-			siteScriptContent.$schema = "schema.json";
-			return { Warnings: [], JSON: siteScriptContent };
 		});
+
+		const defaultContent = this.schemaService.getNewSiteScript();
+		const siteScriptContent = assign(defaultContent, JSON.parse(response.value)) as ISiteScriptContent;
+		siteScriptContent.$schema = "schema.json";
+		return { Warnings: [], JSON: siteScriptContent };
 	}
-	public getSiteScriptFromWeb(webUrl: string, options?: IGetSiteScriptFromWebOptions): Promise<IGetSiteScriptFromExistingResourceResult> {
+
+	public async getSiteScriptFromWeb(webUrl: string, options?: IGetSiteScriptFromWebOptions): Promise<IGetSiteScriptFromExistingResourceResult> {
 		const info = {};
 		if (options) {
 			if (options.includeBranding === true || options.includeBranding === false) {
@@ -254,15 +270,15 @@ export class SiteDesignsService implements ISiteDesignsService {
 				info["IncludeLinksToExportedItems"] = options.includeLinksToExportedItems;
 			}
 		}
-		return this._restRequest('/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.GetSiteScriptFromWeb', {
+		const response = await this._restRequest<{ JSON: string, Warnings: string[] }>('/_api/Microsoft.Sharepoint.Utilities.WebTemplateExtensions.SiteScriptUtility.GetSiteScriptFromWeb', {
 			webUrl,
 			info
-		}).then(result => {
-			const defaultContent = this.schemaService.getNewSiteScript();
-			const siteScriptContent = assign(defaultContent, JSON.parse(result.JSON)) as ISiteScriptContent;
-			siteScriptContent.$schema = "schema.json";
-			return { Warnings: result.Warnings, JSON: siteScriptContent };
 		});
+
+		const defaultContent = this.schemaService.getNewSiteScript();
+		const siteScriptContent = assign(defaultContent, JSON.parse(response.JSON)) as ISiteScriptContent;
+		siteScriptContent.$schema = "schema.json";
+		return { Warnings: response.Warnings, JSON: siteScriptContent };
 	}
 }
 

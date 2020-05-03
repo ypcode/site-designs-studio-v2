@@ -100,7 +100,7 @@ export const SiteScriptsList = (props: ISiteScriptsListProps) => {
                     onRenderGridItem={renderSiteScriptGridItem}
                 />
                 {seeMore && <div className={styles.seeMore}>
-                    {`There are more than ${PREVIEW_ITEMS_COUNT} available Site Scripts on your tenant. `}
+                    {`There are more than ${PREVIEW_ITEMS_COUNT} available Site Scripts in your tenant. `}
                     <Link onClick={() => executeAction("GO_TO", { page: "SiteScriptsList" })}>See all Site Scripts</Link>
                 </div>}
             </div>

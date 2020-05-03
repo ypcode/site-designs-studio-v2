@@ -4,6 +4,7 @@ import { IApplicationState } from "../../app/ApplicationState";
 import { ActionType, IEditSiteDesignActionArgs } from "../../app/IApplicationAction";
 import { ISiteDesignsListAllOptionalProps, SiteDesignsList } from "./SiteDesignsList";
 import { ISiteDesign } from "../../models/ISiteDesign";
+import { createNewSiteDesign } from "../../helpers/SiteDesignsHelpers";
 
 
 /**
@@ -18,21 +19,12 @@ export const SiteDesignsListInContext = (props: ISiteDesignsListAllOptionalProps
     };
 
     const onNewSiteDesignAdded = () => {
-        const siteDesign: ISiteDesign = {
-            Id: null,
-            Title: null,
-            Description: null,
-            Version: 1,
-            IsDefault: false,
-            PreviewImageAltText: null,
-            PreviewImageUrl: null,
-            SiteScriptIds: [],
-            WebTemplate: ""
-        };
+        const siteDesign: ISiteDesign = createNewSiteDesign();
         executeAction("EDIT_SITE_DESIGN", { siteDesign } as IEditSiteDesignActionArgs);
     };
 
     return <SiteDesignsList siteDesigns={appContext.allAvailableSiteDesigns}
         onSiteDesignClicked={onSiteDesignClick}
+        onSeeMore={() => executeAction("GO_TO", { page: "SiteDesignsList" })}
         onAdd={onNewSiteDesignAdded}  {...props} />;
 };

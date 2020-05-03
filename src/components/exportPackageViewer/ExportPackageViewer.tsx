@@ -42,6 +42,9 @@ export const ExportPackageViewer = (props: IExportPackageViewerProps) => {
         }
     };
 
+    const currentContent = props.exportPackage.hasContent(currentFile)
+        ? props.exportPackage.getFileContent(currentFile)
+        : "";
     return <div className={styles.ExportPackageViewer}>
         <div className={styles.row}>
             <div className={styles.column}>
@@ -77,7 +80,7 @@ export const ExportPackageViewer = (props: IExportPackageViewerProps) => {
                             enabled: false
                         }
                     }}
-                    value={props.exportPackage.getFileContent(currentFile)}
+                    value={currentContent}
                 />
             </div>
         </div>

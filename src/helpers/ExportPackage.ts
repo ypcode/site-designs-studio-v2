@@ -23,6 +23,10 @@ export class ExportPackage {
         return this._contents[fileName];
     }
 
+    public hasContent(fileName: string): boolean {
+        return !!this._contents[fileName];
+    }
+
     private get hasSingleFile(): boolean {
         return this.allFiles.length == 1;
     }
