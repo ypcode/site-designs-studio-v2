@@ -46,7 +46,7 @@ class SitesService implements ISitesService {
         const lists = await web.lists.expand("RootFolder").select("Title", "Id", "RootFolder/ServerRelativeUrl").get();
         return lists.map(l => {
             const url = `${serverUrl}${l.RootFolder.ServerRelativeUrl}`;
-            const webRelativeUrl = url.replace(webUrl, "");
+            const webRelativeUrl = url.toLowerCase().replace(webUrl.toLowerCase(), "");
             return {
                 title: l.Title,
                 url,

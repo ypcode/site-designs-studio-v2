@@ -246,7 +246,7 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
         } catch (error) {
             execute("SET_USER_MESSAGE", {
                 userMessage: {
-                    message: `${siteScriptMetadata.Title} could not be saved.`,
+                    message: `${siteScriptMetadata.Title} could not be saved. Please make sure you have SharePoint administrator privileges...`,
                     messageType: MessageBarType.error
                 }
             } as ISetUserMessageArgs);
@@ -279,7 +279,7 @@ export const SiteScriptEditor = (props: ISiteScriptEditorProps) => {
         } catch (error) {
             execute("SET_USER_MESSAGE", {
                 userMessage: {
-                    message: `${siteScriptMetadata.Title} could not be deleted.`,
+                    message: `${siteScriptMetadata.Title} could not be deleted. Please make sure you have SharePoint administrator privileges...`,
                     messageType: MessageBarType.error
                 }
             } as ISetUserMessageArgs);

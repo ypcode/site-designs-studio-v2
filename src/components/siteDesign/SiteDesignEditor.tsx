@@ -261,7 +261,7 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
         } catch (error) {
             execute("SET_USER_MESSAGE", {
                 userMessage: {
-                    message: `${editingSiteDesign.Title} could not be deleted.`,
+                    message: `${editingSiteDesign.Title} could not be saved. Please make sure you have SharePoint administrator privileges...`,
                     messageType: MessageBarType.error
                 }
             } as ISetUserMessageArgs);
@@ -294,7 +294,7 @@ export const SiteDesignEditor = (props: ISiteDesignEditorProps) => {
         } catch (error) {
             execute("SET_USER_MESSAGE", {
                 userMessage: {
-                    message: `${editingSiteDesign.Title} could not be deleted.`,
+                    message: `${editingSiteDesign.Title} could not be deleted. Please make sure you have SharePoint administrator privileges...`,
                     messageType: MessageBarType.error
                 }
             } as ISetUserMessageArgs);
