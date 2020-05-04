@@ -48,7 +48,7 @@ The Site Designs Studio V2 comes with the following features
 
 ## Important to know
 
-The application will work in "read-only" for any users having access to the site. However, to be able to save and edit Site Designs and Site Scripts, the users *must" have the SharePoint global administrator privileges !
+The application will work in "read-only" for any users having access to the site. However, to be able to save and edit Site Designs and Site Scripts, the users *must* have the SharePoint global administrator privileges !
 
 ## API Permissions
 
