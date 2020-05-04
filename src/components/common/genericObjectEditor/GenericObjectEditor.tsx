@@ -44,6 +44,15 @@ export function PropertyEditor(props: IPropertyEditorProps) {
         onChange(v.key);
     });
 
+    const onNumberInputChange = ((ev: any, v: any) => {
+        if (typeof (v) === "number") {
+            onChange(v);
+        } else {
+            const number = parseFloat(v as string);
+            onChange(number);
+        }
+    });
+
     const onInputChange = ((ev: any, v: any) => {
         onChange(v);
     });
@@ -96,6 +105,15 @@ export function PropertyEditor(props: IPropertyEditorProps) {
                     onObjectChanged={onChange}
                 />;
             case 'number':
+                return (
+                    <TextField
+                        required={required}
+                        label={label}
+                        value={value}
+                        readOnly={readonly}
+                        onChange={onNumberInputChange}
+                    />
+                );
             case 'string':
             default:
                 return (

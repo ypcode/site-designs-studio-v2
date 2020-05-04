@@ -5,7 +5,7 @@ import { SiteScriptSchemaServiceKey } from "../../services/siteScriptSchema/Site
 import { RenderingServiceKey } from "../../services/rendering/RenderingService";
 import { ActionType } from "../../app/IApplicationAction";
 import styles from "./SiteScriptDesigner.module.scss";
-import { Adder, IAddableItem } from "../common/adder/Adder";
+import { Adder, IAddableItem } from "../common/Adder/Adder";
 import { IconButton, Link, Label, Icon, Stack } from "office-ui-fabric-react";
 import { useState, useEffect } from "react";
 import { getTrimmedText } from "../../utils/textUtils";
@@ -224,7 +224,6 @@ export const SiteScriptDesigner = (props: ISiteScriptDesignerProps) => {
     const previousContentUI = usePrevious<ISiteScriptContentUIWrapper>(contentUI);
     const updateUITimeoutRef = React.useRef<any>(null);
     useEffect(() => {
-        console.log("Site script content changed");
         const newContentUI = new SiteScriptContentUIWrapper(props.siteScriptContent);
         if (previousContentUI) {
             newContentUI.editingActionKeys = previousContentUI.editingActionKeys;

@@ -121,11 +121,14 @@ const SiteScriptEditorReducer: (state: ISiteScriptEditorState, action: SiteScrip
                 };
                 break;
             default:
-                console.debug("SiteScriptEditor:: state unchanged");
+                if (DEBUG) {
+                    console.debug("SiteScriptEditor:: state unchanged");
+                }
                 return state;
         }
-
-        console.debug("SiteScriptEditor:: state changed: ", updatedState, " due to action ", action);
+        if (DEBUG) {
+            console.debug("SiteScriptEditor:: state changed: ", updatedState, " due to action ", action);
+        }
         return updatedState;
     };
 

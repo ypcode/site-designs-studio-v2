@@ -19,7 +19,7 @@ import { WebTemplate, ISiteDesignWithGrantedRights, ISiteDesignGrantedPrincipal 
 import { useAppContext } from "../../app/App";
 import { IApplicationState } from "../../app/ApplicationState";
 import { ActionType, ISetAllAvailableSiteDesigns, IGoToActionArgs, ISetUserMessageArgs } from "../../app/IApplicationAction";
-import { Adder, IAddableItem } from "../common/adder/Adder";
+import { Adder, IAddableItem } from "../common/Adder/Adder";
 import { SiteDesignsServiceKey } from "../../services/siteDesigns/SiteDesignsService";
 import { ISiteScript } from "../../models/ISiteScript";
 import { Confirm } from "../common/confirm/Confirm";
