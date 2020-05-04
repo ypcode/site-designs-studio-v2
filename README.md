@@ -1,12 +1,12 @@
 # Site Designs Studio V2
 
 The Site Design Studio v2 is a new version of the solution.
-It is designed to be used as an entire solution on a tenant to provision the customization and configuration to the sites allowing its users to create and manage Site Designs and Site Scripts without the need to write any Powershell nor JSON.
+It is designed to be used as an entire solution on a tenant to provision the customization and configuration to the sites allowing its users to create and manage Site Designs and Site Scripts without the need to write any PowerShell nor JSON.
 
 ## Setup
 
 The solution is shipped as an application hosted in its own site collection.
-It can be installed using a setup powershell script (it requires PnP Powershell to be installed)
+It can be installed using a setup PowerShell script (it requires PnP PowerShell to be installed)
 
 The setup guide is [here](./setup/PnPPowershell/setup.md)
 
@@ -35,7 +35,7 @@ The Site Designs Studio V2 comes with the following features
   - When the site is selected, a dropdown allows the select the list to generated the Site Script from.
 - When a new Site Script is created, the UI allows the user to directly associate it to either an existing Site Design or to a new Site Design.
 - From the action button, a Site Script can be exported as package to be deployed to another tenant
-  - The export package comes as several flavors (JSON, PnP Powershell, O365 CLI Powershell, O365 CLI Bash)
+  - The export package comes as several flavors (JSON, PnP PowerShell, O365 CLI PowerShell, O365 CLI Bash)
 
 ### Create a Site Script from an existing site
 ![Create from Site](docs/sdsv2_demo01.gif)
@@ -48,7 +48,7 @@ The Site Designs Studio V2 comes with the following features
 
 ## Important to know
 
-The application will work in "read-only" for any users having access to the site. However, to be able to save and edit Site Designs and Site Scripts, the users *must" have the SharePoint global adminstrator privileges !
+The application will work in "read-only" for any users having access to the site. However, to be able to save and edit Site Designs and Site Scripts, the users *must" have the SharePoint global administrator privileges !
 
 ## API Permissions
 
@@ -57,9 +57,3 @@ CAUTION:
 The solution is installed globally on the tenant, it means this permission, when granted, will be granted to the whole tenant.
 However, it will allow the application to only see the groups and users the current user is allowed to see. Thus, it should not cause any security breach.
 It will only be needed for the ability to grant Site Designs to specific principals. The other features will be working seamlessly without this granted permission 
-
-
-
-
-
-
